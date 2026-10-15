@@ -1,0 +1,1023 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>PQRS 영쌤 학생 학습센터</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <style>
+    body { font-family: 'Pretendard', 'Malgun Gothic', sans-serif; background-color: #f8fafc; -webkit-tap-highlight-color: transparent; }
+    .flip-card { background-color: transparent; width: 100%; height: 170px; perspective: 1000px; }
+    .flip-card-inner { position: relative; width: 100%; height: 100%; text-align: center; transition: transform 0.5s; transform-style: preserve-3d; cursor: pointer; }
+    .flip-card.flipped .flip-card-inner { transform: rotateY(180deg); }
+    .flip-card-front, .flip-card-back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 14px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); padding: 12px; }
+    .flip-card-front { background-color: #1E3A8A; color: white; }
+    .flip-card-back { background-color: #ffffff; color: #1E3A8A; transform: rotateY(180deg); border: 2px solid #1E3A8A; }
+  </style>
+</head>
+<body class="min-h-screen pb-20">
+
+  <!-- 상단 고정 헤더 -->
+  <header class="bg-blue-900 text-white shadow-md sticky top-0 z-30">
+    <div class="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center space-x-2">
+        <span class="text-2xl">🎓</span>
+        <h1 class="text-base md:text-xl font-bold tracking-tight">PQRS 영쌤 학습센터</h1>
+      </div>
+      <div class="flex items-center space-x-2">
+        <select id="studentSelect" onchange="onStudentChange()" class="bg-white text-blue-950 font-extrabold text-sm rounded-lg px-3 py-2 border-2 border-yellow-400 focus:outline-none shadow-sm">
+          <option value="">👉 내 이름 선택</option>
+        </select>
+      </div>
+    </div>
+    <!-- 메뉴 탭 -->
+    <div class="max-w-4xl mx-auto px-2 flex border-t border-blue-800 bg-blue-950 text-xs md:text-sm font-semibold">
+      <button onclick="switchTab('rank')" id="tabBtn_rank" class="flex-1 py-3 text-center border-b-4 border-yellow-400 text-yellow-300">🏆 포인트 랭킹</button>
+      <button onclick="switchTab('flash')" id="tabBtn_flash" class="flex-1 py-3 text-center border-b-4 border-transparent text-blue-200">📇 단어 암기장</button>
+      <button onclick="switchTab('exam')" id="tabBtn_exam" class="flex-1 py-3 text-center border-b-4 border-transparent text-blue-200">⏱️ 실전 단어시험</button>
+    </div>
+  </header>
+
+  <main class="max-w-4xl mx-auto px-4 pt-4">
+    <!-- 초기 로딩 표시 -->
+    <div id="globalLoader" class="text-center py-14">
+      <div class="inline-block animate-spin rounded-full h-9 w-9 border-4 border-blue-900 border-t-transparent"></div>
+      <p class="mt-3 text-sm text-slate-600 font-bold">학원 데이터베이스에 연결 중입니다...</p>
+    </div>
+
+    <!-- 학생 개인 요약 대시보드 (이름 선택 시 상단 고정 표시) -->
+    <section id="studentDashboard" class="hidden mb-5 space-y-3">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+          <p class="text-xs text-emerald-700 font-bold">💎 나의 장학금 포인트</p>
+          <p id="myPointsText" class="text-2xl font-extrabold text-emerald-900 mt-1">0 P</p>
+          <p class="text-[11px] text-emerald-600 mt-0.5">50P 달성 시 25,000원!</p>
+        </div>
+        <div class="bg-blue-50 border border-blue-200 rounded-xl p-3">
+          <p class="text-xs text-blue-700 font-bold">📅 나의 성실도</p>
+          <p id="myAttText" class="text-xs font-bold text-blue-950 mt-1.5 leading-relaxed">출석 0 / 보충 0<br>지각 0 / 결석 0</p>
+        </div>
+        <div class="bg-rose-50 border border-rose-200 rounded-xl p-3 col-span-2">
+          <p class="text-xs text-rose-700 font-bold">🚨 단어 재시 및 과제 알림</p>
+          <div id="myAlertsText" class="text-xs text-rose-900 mt-1 space-y-1 font-medium">대기 중인 재시나 미제출 과제가 없습니다.</div>
+        </div>
+      </div>
+
+      <!-- 주간 진도표 -->
+      <div id="weeklyProgressBox" class="hidden bg-indigo-50 border border-indigo-200 rounded-xl p-3.5">
+        <p id="weeklyTitle" class="text-xs font-bold text-indigo-900 mb-2">📢 나의 이번 주 학습 진도 및 단어 범위</p>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
+          <div class="bg-white p-2.5 rounded-lg border border-indigo-100"><span class="font-bold text-indigo-800 block mb-1">📚 1회차 수업</span><span id="weekly1" class="whitespace-pre-line text-slate-700"></span></div>
+          <div class="bg-white p-2.5 rounded-lg border border-indigo-100"><span class="font-bold text-indigo-800 block mb-1">📚 2회차 수업</span><span id="weekly2" class="whitespace-pre-line text-slate-700"></span></div>
+          <div class="bg-white p-2.5 rounded-lg border border-indigo-100"><span class="font-bold text-indigo-800 block mb-1">🏥 클리닉</span><span id="weeklyClinic" class="whitespace-pre-line text-slate-700"></span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 이름 미선택 안내창 -->
+    <div id="noNameWarning" class="hidden bg-amber-50 border-2 border-amber-300 rounded-xl p-6 text-center my-6 shadow-sm">
+      <p class="text-base md:text-lg font-extrabold text-amber-900">👆 화면 오른쪽 위에서 '내 이름'을 먼저 선택해 주세요!</p>
+      <p class="text-xs text-amber-700 mt-1.5">한 번 선택해 두면 스마트폰이 기억하여 다시 풀리지 않습니다.</p>
+    </div>
+
+    <!-- [탭 0] 장학금 포인트 랭킹 -->
+    <section id="tabContent_rank" class="hidden space-y-4">
+      <div class="bg-blue-50 border border-blue-200 rounded-xl p-3.5 text-xs md:text-sm text-blue-900">
+        💡 <b>50포인트를 달성하면 25,000원의 장학금이 지급됩니다!</b><br>
+        <span class="text-xs text-blue-700">* 본시험 통과(+1P), 재시/미응시 24시간 내 통과(+0.5P), 과제 제출(+1P)</span>
+      </div>
+
+      <div id="honorBox" class="hidden bg-amber-50 border-2 border-amber-300 rounded-xl p-4 text-center">
+        <p class="text-sm font-extrabold text-amber-900">🎊 명예의 전당 (50P 장학금 수령자) 🎊</p>
+        <p id="honorNames" class="text-sm font-bold text-amber-800 mt-1"></p>
+      </div>
+
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="px-4 py-3 bg-slate-100 border-b border-slate-200 font-bold text-sm text-slate-800">🔥 현재 진행 중인 장학금 랭킹</div>
+        <div class="overflow-x-auto max-h-[500px]">
+          <table class="w-full text-sm text-left">
+            <thead class="text-xs text-slate-600 bg-slate-50 sticky top-0 border-b">
+              <tr>
+                <th class="px-4 py-2.5">순위</th>
+                <th class="px-4 py-2.5">학생명</th>
+                <th class="px-4 py-2.5">학교</th>
+                <th class="px-4 py-2.5">학년</th>
+                <th class="px-4 py-2.5 text-right">누적 포인트</th>
+              </tr>
+            </thead>
+            <tbody id="rankingTableBody" class="divide-y divide-slate-100"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- [탭 1] 단어 암기장 (플래시카드) -->
+    <section id="tabContent_flash" class="hidden space-y-4">
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+        <h2 class="text-base font-bold text-slate-800 mb-3">📇 스마트 단어 암기장</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-600 mb-1">학습할 단어장</label>
+            <select id="flashCat" onchange="onFlashCatChange()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-medium"></select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-600 mb-1">시작 번호</label>
+            <input type="number" id="flashStart" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-600 mb-1">끝 번호</label>
+            <input type="number" id="flashEnd" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+          </div>
+        </div>
+        <button onclick="renderFlashcards()" class="mt-3 w-full bg-blue-900 hover:bg-blue-800 text-white font-bold py-2.5 rounded-lg text-sm transition">✨ 암기 시작!</button>
+      </div>
+
+      <p id="flashGuide" class="hidden text-xs text-center text-blue-800 bg-blue-50 py-2 rounded-lg font-medium">💡 카드를 터치하면 뜻과 예문이 뒤집혀 보입니다!</p>
+      <div id="flashcardsContainer" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5"></div>
+    </section>
+
+    <!-- [탭 2] 실전 단어 시험 (객관식) -->
+    <section id="tabContent_exam" class="hidden space-y-4">
+      <!-- 재시 바로가기 목록 -->
+      <div id="examRetakeQuickBox" class="hidden bg-rose-50 border-2 border-rose-300 rounded-xl p-3.5 space-y-2">
+        <p class="text-xs font-extrabold text-rose-800">🚨 아직 통과하지 못한 단어시험(또는 미응시)이 있습니다. 아래 버튼을 누르면 범위가 자동 입력됩니다!</p>
+        <div id="examRetakeButtons" class="space-y-1.5"></div>
+      </div>
+
+      <!-- 시험 설정 박스 -->
+      <div id="examSetupBox" class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+        <h2 class="text-base font-bold text-slate-800 mb-3">⏱️ 온라인 단어 시험 설정</h2>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div class="col-span-2 md:col-span-1">
+            <label class="block text-xs font-bold text-slate-600 mb-1">단어장 선택</label>
+            <select id="examCat" onchange="onExamCatChange()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-medium"></select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-600 mb-1">시작 번호</label>
+            <input type="number" id="examStart" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-600 mb-1">끝 번호</label>
+            <input type="number" id="examEnd" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+          </div>
+          <div class="col-span-2 md:col-span-1">
+            <label class="block text-xs font-bold text-slate-600 mb-1">문항 수</label>
+            <select id="examCount" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-medium">
+              <option value="10">10문항</option>
+              <option value="20">20문항</option>
+              <option value="30">30문항</option>
+              <option value="50" selected>50문항</option>
+              <option value="80">80문항</option>
+              <option value="100">100문항</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="mt-3 pt-3 border-t border-slate-100">
+          <label class="block text-xs font-bold text-slate-600 mb-2">시험 모드 선택 (필수)</label>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <label class="flex items-center space-x-2 border rounded-lg p-2.5 cursor-pointer bg-slate-50">
+              <input type="radio" name="examMode" value="practice" checked class="w-4 h-4 text-blue-900">
+              <span class="text-xs font-bold text-slate-800">🛠️ 연습 모드 <span class="font-normal text-slate-500">(성적 미기록·테스트용)</span></span>
+            </label>
+            <label class="flex items-center space-x-2 border-2 border-rose-300 rounded-lg p-2.5 cursor-pointer bg-rose-50/60">
+              <input type="radio" name="examMode" value="real" class="w-4 h-4 text-rose-600">
+              <span class="text-xs font-bold text-rose-900">🔥 실전 모드 <span class="font-normal text-rose-700">(성적 전송·포인트 획득)</span></span>
+            </label>
+          </div>
+        </div>
+
+        <button onclick="startExam()" class="mt-4 w-full bg-blue-900 hover:bg-blue-800 text-white font-extrabold py-3.5 rounded-xl text-sm shadow transition">🚀 시험 시작하기!</button>
+      </div>
+
+      <!-- 진행 중인 시험지 영역 -->
+      <div id="examPaperBox" class="hidden space-y-4">
+        <div class="bg-slate-900 text-white p-3.5 rounded-xl sticky top-[104px] z-20 flex items-center justify-between shadow-lg">
+          <div>
+            <span id="examHeaderBadge" class="text-[11px] font-extrabold px-2 py-0.5 rounded bg-rose-600 text-white mr-1">🔥 실전</span>
+            <span id="examHeaderTitle" class="text-xs md:text-sm font-bold"></span>
+            <span id="examProgressCount" class="ml-2 text-xs text-emerald-300 font-bold"></span>
+          </div>
+          <div class="flex items-center space-x-2">
+            <span id="examTimerText" class="text-xs md:text-sm font-mono font-bold text-yellow-300">00:00 / 15:00</span>
+            <button onclick="cancelExam()" class="text-[11px] bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded text-slate-200">포기/재설정</button>
+          </div>
+        </div>
+
+        <div id="examQuestionsList" class="space-y-3.5"></div>
+
+        <button id="submitExamBtn" onclick="submitExam()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-4 rounded-xl text-base shadow-lg transition">✅ 최종 제출 및 채점하기</button>
+      </div>
+
+      <!-- 시험 결과 및 오답노트 영역 -->
+      <div id="examResultBox" class="hidden bg-white p-5 rounded-xl shadow-md border-2 border-blue-900 space-y-4"></div>
+    </section>
+  </main>
+
+  <script>
+    // ==========================================
+    // 1. Supabase 연결 설정
+    // ==========================================
+    const SUPABASE_URL = "https://pkjeiaivklkgahrahayw.supabase.co";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBramVpYWl2a2xrZ2FocmFoYXl3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5NzA5MjksImV4cCI6MjEwNzU0NjkyOX0.I_Yyjkdsy1S-_tW8q_FbLqsLWH_c2JyDjTgxi8fJamY";
+    const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    let allStudents = [];
+    let allWordbook = [];
+    let allPoints = [];
+    let myVocabTests = [];
+    let myRetakes = [];
+
+    // URL 파라미터와 스마트폰 저장소(localStorage) 이중 연동
+    const urlParams = new URLSearchParams(window.location.search);
+    let currentStudent = urlParams.get("student") || localStorage.getItem("pqrs_student") || "";
+    let currentTab = urlParams.get("tab") || localStorage.getItem("pqrs_tab") || "rank";
+    let examTimerInterval = null;
+    let isSubmittingExam = false;
+
+    function syncUrlParams() {
+      const params = new URLSearchParams();
+      if (currentStudent) params.set("student", currentStudent);
+      if (currentTab) params.set("tab", currentTab);
+      const newUrl = `${window.location.pathname}?${params.toString()}`;
+      window.history.replaceState({}, "", newUrl);
+    }
+
+    function getKSTDateString() {
+      const now = new Date();
+      const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+      const kstTime = new Date(utc + (9 * 3600000));
+      const yyyy = kstTime.getFullYear();
+      const mm = String(kstTime.getMonth() + 1).padStart(2, '0');
+      const dd = String(kstTime.getDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    }
+
+    function escapeHtml(str) {
+      return String(str ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function maskName(name) {
+      if (!name || name.length < 2) return name;
+      if (name.length === 2) return name[0] + "*";
+      return name[0] + "*".repeat(name.length - 2) + name[name.length - 1];
+    }
+
+    function extractPureRange(text) {
+      if (!text || typeof text !== 'string') return "";
+      try {
+        if (text.includes(']')) return text.split(']')[1].split('(')[0].trim();
+        return text.split('(')[0].trim();
+      } catch (e) { return text; }
+    }
+
+    // 단어장이 몇천 개든 누락 없이 100% 다 가져오는 자동 페이지네이션 함수
+    async function fetchAllRows(tableName, selectCols = "*") {
+      let allData = [];
+      let from = 0;
+      const step = 1000;
+      while (true) {
+        const { data, error } = await db.from(tableName).select(selectCols).range(from, from + step - 1);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        allData = allData.concat(data);
+        if (data.length < step) break;
+        from += step;
+      }
+      return allData;
+    }
+
+    // 네트워크 흔들림 시 4회 자동 재시도 저장 함수
+    async function safeInsert(tableName, rowObj, retries = 4) {
+      for (let i = 0; i < retries; i++) {
+        const { error } = await db.from(tableName).insert(rowObj);
+        if (!error) return true;
+        if (i < retries - 1) await new Promise(r => setTimeout(r, 700));
+        else throw error;
+      }
+      return false;
+    }
+
+    // ==========================================
+    // 2. 초기 데이터 로드
+    // ==========================================
+    async function initApp() {
+      try {
+        const [stData, ptData, wbData] = await Promise.all([
+          fetchAllRows("students", "*"),
+          fetchAllRows("points", "이름, 포인트증감"),
+          fetchAllRows("wordbook", "*")
+        ]);
+
+        allStudents = stData || [];
+        allPoints = ptData || [];
+        allWordbook = (wbData || []).map(w => ({
+          ...w,
+          단어번호: parseInt(w.단어번호, 10) || 0,
+          영어단어: String(w.영어단어 ?? "").trim(),
+          뜻: String(w.뜻 ?? "").trim()
+        }));
+
+        const activeList = allStudents.filter(s => s.상태 === "재원").map(s => s.이름).sort();
+        const selectEl = document.getElementById("studentSelect");
+        selectEl.innerHTML = '<option value="">👉 내 이름 선택</option>';
+        activeList.forEach(name => {
+          const opt = document.createElement("option");
+          opt.value = name;
+          opt.textContent = name;
+          if (name === currentStudent) opt.selected = true;
+          selectEl.appendChild(opt);
+        });
+
+        initWordbookCategories();
+        renderRanking();
+
+        document.getElementById("globalLoader").classList.add("hidden");
+
+        if (currentStudent && activeList.includes(currentStudent)) {
+          localStorage.setItem("pqrs_student", currentStudent);
+          await loadStudentPersonalData(currentStudent);
+        } else {
+          currentStudent = "";
+          localStorage.removeItem("pqrs_student");
+        }
+
+        switchTab(currentTab);
+        restoreOngoingExamIfAny();
+      } catch (err) {
+        alert("데이터를 불러오는 중 일시적 네트워크 오류가 발생했습니다. 화면을 새로고침 해주세요: " + err.message);
+      }
+    }
+
+    function initWordbookCategories() {
+      const cats = [...new Set(allWordbook.map(w => w.분류).filter(Boolean))];
+      const flashCatEl = document.getElementById("flashCat");
+      const examCatEl = document.getElementById("examCat");
+      flashCatEl.innerHTML = "";
+      examCatEl.innerHTML = "";
+      cats.forEach(c => {
+        flashCatEl.add(new Option(c, c));
+        examCatEl.add(new Option(c, c));
+      });
+      if (cats.length > 0) {
+        onFlashCatChange();
+        onExamCatChange();
+      }
+    }
+
+    function onFlashCatChange() {
+      const cat = document.getElementById("flashCat").value;
+      const filtered = allWordbook.filter(w => w.분류 === cat);
+      if (!filtered.length) return;
+      const nums = filtered.map(w => w.단어번호);
+      document.getElementById("flashStart").value = Math.min(...nums);
+      document.getElementById("flashEnd").value = Math.max(...nums);
+    }
+
+    function onExamCatChange() {
+      const cat = document.getElementById("examCat").value;
+      const filtered = allWordbook.filter(w => w.분류 === cat);
+      if (!filtered.length) return;
+      const nums = filtered.map(w => w.단어번호);
+      document.getElementById("examStart").value = Math.min(...nums);
+      document.getElementById("examEnd").value = Math.max(...nums);
+    }
+
+    // ==========================================
+    // 3. 학생 선택 및 개인 데이터 업데이트
+    // ==========================================
+    async function onStudentChange() {
+      const selected = document.getElementById("studentSelect").value;
+      currentStudent = selected;
+      if (selected) {
+        localStorage.setItem("pqrs_student", selected);
+        syncUrlParams();
+        await loadStudentPersonalData(selected);
+        restoreOngoingExamIfAny();
+      } else {
+        localStorage.removeItem("pqrs_student");
+        syncUrlParams();
+        document.getElementById("studentDashboard").classList.add("hidden");
+      }
+      switchTab(currentTab);
+    }
+
+    async function loadStudentPersonalData(stName) {
+      document.getElementById("studentDashboard").classList.remove("hidden");
+      const stInfo = allStudents.find(s => s.이름 === stName) || {};
+      const myGradeRaw = String(stInfo.학년 || "");
+      const myGrade = myGradeRaw ? myGradeRaw.replace(/고|학년/g, "").trim() + "학년" : "";
+      const earlyReq = parseInt(stInfo["사전등원(분)"], 10) || 0;
+
+      const [ptRes, attRes, vocRes, hwRes, wkRes] = await Promise.all([
+        db.from("points").select("포인트증감").eq("이름", stName),
+        db.from("attendance").select("출결, 사전등원달성").eq("이름", stName),
+        db.from("vocab_tests").select("날짜, 이름, 점수, 결과, 비고").eq("이름", stName),
+        db.from("assignments").select("과제명, 결과, 날짜").eq("이름", stName).eq("결과", "진행중"),
+        myGrade ? db.from("weekly_progress").select("*").eq("학년", myGrade) : Promise.resolve({ data: [] })
+      ]);
+
+      const myPts = (ptRes.data || []).reduce((acc, cur) => acc + (parseFloat(cur.포인트증감) || 0), 0);
+      document.getElementById("myPointsText").textContent = `${Number(myPts.toFixed(1))} P`;
+
+      const attData = attRes.data || [];
+      const attC = attData.filter(x => x.출결 === "출석").length;
+      const mkC = attData.filter(x => x.출결 === "보충").length;
+      const lateC = attData.filter(x => x.출결 === "지각").length;
+      const absC = attData.filter(x => x.출결 === "결석").length;
+      const earlyC = attData.filter(x => x.사전등원달성 === "성공").length;
+      let attHtml = `출석 ${attC} / 보충 ${mkC}<br>지각 ${lateC} / 결석 ${absC}`;
+      if (earlyReq > 0) attHtml += `<br><span class="text-indigo-700">일찍오기 성공: ${earlyC}회</span>`;
+      document.getElementById("myAttText").innerHTML = attHtml;
+
+      myVocabTests = vocRes.data || [];
+      const grouped = {};
+      myVocabTests.forEach(row => {
+        const pr = extractPureRange(row.비고);
+        if (!pr) return;
+        if (!grouped[pr]) grouped[pr] = [];
+        grouped[pr].push(row);
+      });
+
+      myRetakes = [];
+      Object.keys(grouped).forEach(pr => {
+        const list = grouped[pr];
+        list.sort((a, b) => String(a.날짜).localeCompare(String(b.날짜)));
+        const lastExam = list[list.length - 1];
+        const resStr = String(lastExam.결과 || "");
+        if (resStr.includes("미통과") || resStr.includes("미응시")) {
+          myRetakes.push({ range: pr, date: lastExam.날짜, count: list.length });
+        }
+      });
+
+      const alertsBox = document.getElementById("myAlertsText");
+      const hws = hwRes.data || [];
+      let alertLines = [];
+      if (myRetakes.length > 0) {
+        alertLines.push(`🚨 <b>미통과/미응시 재시: ${myRetakes.length}건</b> 대기 중! (실전 단어시험 탭에서 응시)`);
+      }
+      if (hws.length > 0) {
+        const hwNames = hws.map(h => `${escapeHtml(h.과제명)}(~${escapeHtml(h.날짜)})`).join(", ");
+        alertLines.push(`📝 <b>미제출 과제(${hws.length}건):</b> ${hwNames}`);
+      }
+      alertsBox.innerHTML = alertLines.length > 0 ? alertLines.join("<br>") : "<span class='text-emerald-700 font-bold'>🎉 대기 중인 재시나 미제출 과제가 없습니다!</span>";
+
+      renderRetakeQuickButtons();
+
+      const wkBox = document.getElementById("weeklyProgressBox");
+      if (wkRes.data && wkRes.data.length > 0) {
+        const w = wkRes.data[0];
+        document.getElementById("weeklyTitle").textContent = `📢 나의 이번 주 학습 진도 및 단어 범위 (${myGrade}) - 업데이트: ${w.업데이트일자 || ''}`;
+        document.getElementById("weekly1").textContent = w["1회차수업"] || "-";
+        document.getElementById("weekly2").textContent = w["2회차수업"] || "-";
+        document.getElementById("weeklyClinic").textContent = w["클리닉"] || "-";
+        wkBox.classList.remove("hidden");
+      } else {
+        wkBox.classList.add("hidden");
+      }
+    }
+
+    function renderRetakeQuickButtons() {
+      const box = document.getElementById("examRetakeQuickBox");
+      const btnContainer = document.getElementById("examRetakeButtons");
+      btnContainer.innerHTML = "";
+      if (!myRetakes.length) {
+        box.classList.add("hidden");
+        return;
+      }
+      box.classList.remove("hidden");
+      myRetakes.forEach(r => {
+        const div = document.createElement("div");
+        div.className = "flex items-center justify-between bg-white px-3 py-2 rounded-lg border border-rose-200 text-xs";
+        div.innerHTML = `<span class="font-bold text-rose-900">📌 ${escapeHtml(r.range)} <span class="font-normal text-slate-500">(발생일: ${escapeHtml(r.date)})</span></span>`;
+        const btn = document.createElement("button");
+        btn.className = "bg-rose-600 hover:bg-rose-700 text-white font-bold px-3 py-1.5 rounded shadow-sm shrink-0 ml-2";
+        btn.textContent = "👉 바로 시험 보기";
+        btn.onclick = () => applyRetakeRange(r.range);
+        div.appendChild(btn);
+        btnContainer.appendChild(div);
+      });
+    }
+
+    function applyRetakeRange(rangeStr) {
+      try {
+        const lastSpaceIdx = rangeStr.lastIndexOf(" ");
+        const cat = rangeStr.substring(0, lastSpaceIdx).trim();
+        const numsPart = rangeStr.substring(lastSpaceIdx + 1).replace("번", "").split("~");
+        const sNum = parseInt(numsPart[0], 10);
+        const eNum = parseInt(numsPart[1], 10);
+
+        document.getElementById("examCat").value = cat;
+        document.getElementById("examStart").value = sNum;
+        document.getElementById("examEnd").value = eNum;
+        document.querySelector('input[name="examMode"][value="real"]').checked = true;
+        window.scrollTo({ top: document.getElementById("examSetupBox").offsetTop - 120, behavior: "smooth" });
+      } catch (e) {
+        alert("범위를 자동으로 넣지 못했습니다. 아래에서 직접 선택해 주세요.");
+      }
+    }
+
+    // ==========================================
+    // 4. 탭 전환 및 플래시카드
+    // ==========================================
+    function switchTab(tabName) {
+      currentTab = tabName;
+      localStorage.setItem("pqrs_tab", tabName);
+      syncUrlParams();
+
+      ["rank", "flash", "exam"].forEach(t => {
+        const btn = document.getElementById(`tabBtn_${t}`);
+        const content = document.getElementById(`tabContent_${t}`);
+        if (t === tabName) {
+          btn.className = "flex-1 py-3 text-center border-b-4 border-yellow-400 text-yellow-300";
+        } else {
+          btn.className = "flex-1 py-3 text-center border-b-4 border-transparent text-blue-200";
+        }
+        content.classList.add("hidden");
+      });
+
+      const warnBox = document.getElementById("noNameWarning");
+      if (tabName !== "rank" && !currentStudent) {
+        warnBox.classList.remove("hidden");
+      } else {
+        warnBox.classList.add("hidden");
+        document.getElementById(`tabContent_${tabName}`).classList.remove("hidden");
+      }
+    }
+
+    function renderRanking() {
+      const payouts = allPoints.filter(p => (parseFloat(p.포인트증감) || 0) <= -50);
+      if (payouts.length > 0) {
+        const honorNames = [...new Set(payouts.map(p => maskName(p.이름)))];
+        document.getElementById("honorNames").textContent = honorNames.join(" / ") + " 학생이 50P를 달성하여 장학금을 수령했습니다!";
+        document.getElementById("honorBox").classList.remove("hidden");
+      }
+
+      const ptMap = {};
+      allPoints.forEach(p => {
+        const val = parseFloat(p.포인트증감) || 0;
+        ptMap[p.이름] = (ptMap[p.이름] || 0) + val;
+      });
+
+      const validStudents = allStudents.filter(s => s.상태 === "재원" || s.상태 === "휴원");
+      const ranked = validStudents.map(s => ({
+        학생명: maskName(s.이름),
+        학교: s.학교 || "",
+        학년: String(s.학년 || "").replace(/고|학년/g, "").trim() + "학년",
+        포인트: ptMap[s.이름] || 0
+      })).sort((a, b) => b.포인트 - a.포인트);
+
+      const tbody = document.getElementById("rankingTableBody");
+      tbody.innerHTML = "";
+      ranked.forEach((r, idx) => {
+        const tr = document.createElement("tr");
+        tr.className = idx < 3 ? "bg-yellow-50/50 font-semibold" : "";
+        const medal = idx === 0 ? "🥇 1위" : idx === 1 ? "🥈 2위" : idx === 2 ? "🥉 3위" : `${idx + 1}위`;
+        tr.innerHTML = `
+          <td class="px-4 py-2.5 text-slate-700">${medal}</td>
+          <td class="px-4 py-2.5 text-slate-900 font-bold">${escapeHtml(r.학생명)}</td>
+          <td class="px-4 py-2.5 text-slate-600">${escapeHtml(r.학교)}</td>
+          <td class="px-4 py-2.5 text-slate-600">${escapeHtml(r.학년)}</td>
+          <td class="px-4 py-2.5 text-right font-extrabold text-blue-900">${Number(r.포인트.toFixed(1))} P</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function renderFlashcards() {
+      const cat = document.getElementById("flashCat").value;
+      const sNum = parseInt(document.getElementById("flashStart").value, 10) || 0;
+      const eNum = parseInt(document.getElementById("flashEnd").value, 10) || 0;
+
+      const list = allWordbook.filter(w => w.분류 === cat && w.단어번호 >= sNum && w.단어번호 <= eNum);
+      const container = document.getElementById("flashcardsContainer");
+      container.innerHTML = "";
+
+      if (!list.length) {
+        alert("해당 범위에 단어가 없습니다.");
+        return;
+      }
+
+      document.getElementById("flashGuide").classList.remove("hidden");
+      list.forEach(w => {
+        const card = document.createElement("div");
+        card.className = "flip-card";
+        card.onclick = () => card.classList.toggle("flipped");
+        card.innerHTML = `
+          <div class="flip-card-inner">
+            <div class="flip-card-front">
+              <span class="text-[11px] text-blue-200 mb-0.5">#${w.단어번호}</span>
+              <h3 class="text-xl font-extrabold tracking-wide">${escapeHtml(w.영어단어)}</h3>
+              <p class="text-xs text-slate-300 mt-1">${escapeHtml(w.발음기호)}</p>
+              <p class="text-xs text-blue-300 font-bold mt-0.5">${escapeHtml(w.한글발음)}</p>
+            </div>
+            <div class="flip-card-back">
+              <h3 class="text-base font-extrabold text-blue-950">${escapeHtml(w.뜻)}</h3>
+              <p class="text-xs text-slate-600 mt-2 leading-snug break-keep">${escapeHtml(w.예문)}</p>
+            </div>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    // ==========================================
+    // 5. 실전 단어시험 (선지 번호 잠금 방식으로 버그 100% 차단)
+    // ==========================================
+    function shuffleArray(arr) {
+      const copy = [...arr];
+      for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+      }
+      return copy;
+    }
+
+    function startExam() {
+      if (!currentStudent) {
+        alert("화면 오른쪽 위에서 '내 이름'을 먼저 선택해 주세요!");
+        return;
+      }
+      const cat = document.getElementById("examCat").value;
+      const sNum = parseInt(document.getElementById("examStart").value, 10) || 0;
+      const eNum = parseInt(document.getElementById("examEnd").value, 10) || 0;
+      const qCount = parseInt(document.getElementById("examCount").value, 10) || 50;
+      const mode = document.querySelector('input[name="examMode"]:checked').value;
+
+      const pool = allWordbook.filter(w => w.분류 === cat && w.단어번호 >= sNum && w.단어번호 <= eNum);
+      if (pool.length < qCount) {
+        alert(`지정한 범위의 단어가 ${pool.length}개뿐이라 ${qCount}문항을 출제할 수 없습니다. 범위를 넓히거나 문항 수를 줄여주세요.`);
+        return;
+      }
+
+      const allMeanings = [...new Set(allWordbook.map(w => w.뜻).filter(Boolean))];
+      const sampled = shuffleArray(pool).slice(0, qCount);
+
+      // 💡 [핵심 방어] 시험 시작 시점에 5지선다 보기를 딱 1번만 생성하고, 정답 번호(correctIdx)를 숫자로 영구 고정!
+      const questions = sampled.map((q, idx) => {
+        const wrongPool = allMeanings.filter(m => m !== q.뜻);
+        const wrongs = shuffleArray(wrongPool).slice(0, 4);
+        while (wrongs.length < 4) wrongs.push(`오답 보기 ${wrongs.length + 1}`);
+        const options = shuffleArray([q.뜻, ...wrongs]);
+        const correctIdx = options.indexOf(q.뜻);
+        return {
+          idx: idx + 1,
+          단어번호: q.단어번호,
+          영어단어: q.영어단어,
+          정답뜻: q.뜻,
+          options: options,
+          correctIdx: correctIdx,
+          selectedIdx: null // 학생이 선택한 선지 번호 (0~4)
+        };
+      });
+
+      const examState = {
+        student: currentStudent,
+        cat,
+        sNum,
+        eNum,
+        qCount,
+        isPractice: mode === "practice",
+        startTime: Date.now(),
+        questions
+      };
+
+      localStorage.setItem("pqrs_active_exam_v2", JSON.stringify(examState));
+      document.getElementById("examResultBox").classList.add("hidden");
+      renderActiveExam(examState);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function restoreOngoingExamIfAny() {
+      const saved = localStorage.getItem("pqrs_active_exam_v2");
+      if (!saved) return;
+      try {
+        const examState = JSON.parse(saved);
+        if (examState && examState.student === currentStudent && Array.isArray(examState.questions)) {
+          switchTab("exam");
+          renderActiveExam(examState);
+        }
+      } catch (e) {
+        localStorage.removeItem("pqrs_active_exam_v2");
+      }
+    }
+
+    function renderActiveExam(examState) {
+      document.getElementById("examSetupBox").classList.add("hidden");
+      document.getElementById("examPaperBox").classList.remove("hidden");
+
+      const badge = document.getElementById("examHeaderBadge");
+      if (examState.isPractice) {
+        badge.textContent = "🛠️ 연습 모드";
+        badge.className = "text-[11px] font-extrabold px-2 py-0.5 rounded bg-blue-600 text-white mr-1";
+      } else {
+        badge.textContent = "🔥 실전 모드";
+        badge.className = "text-[11px] font-extrabold px-2 py-0.5 rounded bg-rose-600 text-white mr-1";
+      }
+      document.getElementById("examHeaderTitle").textContent = `${examState.cat} (${examState.sNum}~${examState.eNum}번)`;
+
+      const listEl = document.getElementById("examQuestionsList");
+      listEl.innerHTML = "";
+
+      examState.questions.forEach((q, qIndex) => {
+        const qCard = document.createElement("div");
+        qCard.id = `qCard_${qIndex}`;
+        qCard.className = "bg-white p-4 rounded-xl shadow-sm border-2 " + (q.selectedIdx !== null ? "border-blue-200" : "border-slate-200");
+
+        let optsHtml = "";
+        q.options.forEach((optText, optIndex) => {
+          const isSelected = q.selectedIdx === optIndex;
+          const btnStyle = isSelected
+            ? "border-blue-600 bg-blue-50 text-blue-950 font-bold ring-1 ring-blue-600"
+            : "border-slate-200 bg-white text-slate-800 hover:bg-slate-50";
+          const circleStyle = isSelected
+            ? "bg-blue-600 text-white border-blue-600"
+            : "bg-slate-100 text-slate-600 border-slate-300";
+
+          optsHtml += `
+            <button type="button" id="optBtn_${qIndex}_${optIndex}" onclick="selectAnswerOption(${qIndex}, ${optIndex})"
+              class="w-full text-left flex items-center space-x-3 p-3 rounded-xl border transition ${btnStyle}">
+              <span id="optCircle_${qIndex}_${optIndex}" class="w-6 h-6 rounded-full border text-xs font-extrabold flex items-center justify-center shrink-0 ${circleStyle}">
+                ${optIndex + 1}
+              </span>
+              <span class="text-sm leading-snug break-keep">${escapeHtml(optText)}</span>
+            </button>
+          `;
+        });
+
+        qCard.innerHTML = `
+          <div class="flex items-center justify-between mb-3">
+            <p class="text-sm md:text-base font-extrabold text-slate-900">
+              <span class="text-blue-800 mr-1">Q${q.idx}.</span> '${escapeHtml(q.영어단어)}'의 알맞은 뜻은?
+            </p>
+            <span id="qStatus_${qIndex}" class="text-[11px] font-bold px-2 py-0.5 rounded ${q.selectedIdx !== null ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-500'}">
+              ${q.selectedIdx !== null ? '✓ 선택됨' : '미선택'}
+            </span>
+          </div>
+          <div class="space-y-2">${optsHtml}</div>
+        `;
+        listEl.appendChild(qCard);
+      });
+
+      updateExamProgressCount(examState);
+
+      if (examTimerInterval) clearInterval(examTimerInterval);
+      updateTimerDisplay(examState.startTime);
+      examTimerInterval = setInterval(() => updateTimerDisplay(examState.startTime), 1000);
+    }
+
+    // 💡 학생이 선지를 터치했을 때 선지 재렌더링 없이 즉시 번호(0~4)만 잠금 저장
+    function selectAnswerOption(qIndex, optIndex) {
+      const saved = localStorage.getItem("pqrs_active_exam_v2");
+      if (!saved) return;
+      const examState = JSON.parse(saved);
+      if (!examState.questions[qIndex]) return;
+
+      examState.questions[qIndex].selectedIdx = optIndex;
+      localStorage.setItem("pqrs_active_exam_v2", JSON.stringify(examState));
+
+      // 해당 문항의 버튼 스타일만 즉시 업데이트 (스크롤 튐·선지 바뀜 원천 차단)
+      for (let i = 0; i < 5; i++) {
+        const btn = document.getElementById(`optBtn_${qIndex}_${i}`);
+        const circle = document.getElementById(`optCircle_${qIndex}_${i}`);
+        if (!btn || !circle) continue;
+        if (i === optIndex) {
+          btn.className = "w-full text-left flex items-center space-x-3 p-3 rounded-xl border transition border-blue-600 bg-blue-50 text-blue-950 font-bold ring-1 ring-blue-600";
+          circle.className = "w-6 h-6 rounded-full border text-xs font-extrabold flex items-center justify-center shrink-0 bg-blue-600 text-white border-blue-600";
+        } else {
+          btn.className = "w-full text-left flex items-center space-x-3 p-3 rounded-xl border transition border-slate-200 bg-white text-slate-800 hover:bg-slate-50";
+          circle.className = "w-6 h-6 rounded-full border text-xs font-extrabold flex items-center justify-center shrink-0 bg-slate-100 text-slate-600 border-slate-300";
+        }
+      }
+
+      const card = document.getElementById(`qCard_${qIndex}`);
+      if (card) card.className = "bg-white p-4 rounded-xl shadow-sm border-2 border-blue-200";
+      const statusBadge = document.getElementById(`qStatus_${qIndex}`);
+      if (statusBadge) {
+        statusBadge.textContent = `✓ ${optIndex + 1}번 선택됨`;
+        statusBadge.className = "text-[11px] font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-800";
+      }
+
+      updateExamProgressCount(examState);
+    }
+
+    function updateExamProgressCount(examState) {
+      const total = examState.questions.length;
+      const answered = examState.questions.filter(q => q.selectedIdx !== null && q.selectedIdx !== undefined).length;
+      const el = document.getElementById("examProgressCount");
+      if (el) el.textContent = `[${answered}/${total} 완료]`;
+    }
+
+    function updateTimerDisplay(startTime) {
+      const elapsed = Math.floor((Date.now() - startTime) / 1000);
+      const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
+      const secs = String(elapsed % 60).padStart(2, '0');
+      const timerEl = document.getElementById("examTimerText");
+      timerEl.textContent = `${mins}:${secs} / 15:00`;
+      if (elapsed > 900) {
+        timerEl.className = "text-xs md:text-sm font-mono font-bold text-rose-400 animate-pulse";
+      }
+    }
+
+    function cancelExam() {
+      if (!confirm("현재 풀고 있는 시험을 취소하고 설정 화면으로 돌아갈까요?")) return;
+      if (examTimerInterval) clearInterval(examTimerInterval);
+      localStorage.removeItem("pqrs_active_exam_v2");
+      document.getElementById("examPaperBox").classList.add("hidden");
+      document.getElementById("examSetupBox").classList.remove("hidden");
+    }
+
+    async function submitExam() {
+      if (isSubmittingExam) return;
+      const saved = localStorage.getItem("pqrs_active_exam_v2");
+      if (!saved) return;
+      const examState = JSON.parse(saved);
+
+      // 미응답 문항 번호(selectedIdx === null) 정확히 체크
+      const unanswered = [];
+      examState.questions.forEach((q, idx) => {
+        if (q.selectedIdx === null || q.selectedIdx === undefined) unanswered.push(idx);
+      });
+
+      if (unanswered.length > 0) {
+        const nums = unanswered.map(i => i + 1).join(", ");
+        alert(`🚨 아직 체크하지 않은 문제가 있습니다: ${nums}번 문항을 확인해 주세요!`);
+        const firstCard = document.getElementById(`qCard_${unanswered[0]}`);
+        if (firstCard) {
+          firstCard.className = "bg-white p-4 rounded-xl shadow-sm border-2 border-rose-500 ring-2 ring-rose-300";
+          firstCard.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+        return;
+      }
+
+      isSubmittingExam = true;
+      const submitBtn = document.getElementById("submitExamBtn");
+      submitBtn.disabled = true;
+      submitBtn.textContent = "⏳ 안전하게 채점 및 성적 전송 중입니다... (잠시만 기다려주세요)";
+
+      try {
+        const examStudent = examState.student || currentStudent;
+        const correctCount = examState.questions.filter(q => q.selectedIdx === q.correctIdx).length;
+        const finalScore = Math.floor((correctCount / examState.questions.length) * 100);
+
+        const stInfo = allStudents.find(s => s.이름 === examStudent) || {};
+        const missRate = parseInt(stInfo.오답허용률, 10) || 10;
+        const passCutoff = 100 - missRate;
+
+        const elapsedSecs = Math.floor((Date.now() - examState.startTime) / 1000);
+        const mins = Math.floor(elapsedSecs / 60);
+        const secs = elapsedSecs % 60;
+
+        let status = "";
+        if (elapsedSecs > 900) status = "미통과 (15분 시간초과)";
+        else if (finalScore < passCutoff) status = `미통과 (기준 ${passCutoff}점)`;
+        else status = `통과 (기준 ${passCutoff}점)`;
+
+        const pureRange = `${examState.cat} ${examState.sNum}~${examState.eNum}번`;
+        const todayStr = getKSTDateString();
+        let pointAddedMsg = "";
+
+        if (!examState.isPractice) {
+          const pastFails = myVocabTests.filter(v =>
+            v.이름 === examStudent &&
+            String(v.비고 || "").includes(pureRange) &&
+            (String(v.결과 || "").includes("미통과") || String(v.결과 || "").includes("미응시"))
+          );
+
+          const isRetake = pastFails.length > 0;
+          let pointToAdd = 0;
+          let pointReason = "";
+
+          if (isRetake && status.startsWith("통과")) {
+            const lastFailDateStr = pastFails[pastFails.length - 1].날짜;
+            const d1 = new Date(todayStr);
+            const d2 = new Date(lastFailDateStr);
+            const diffDays = Math.round((d1 - d2) / (1000 * 60 * 60 * 24));
+            if (diffDays <= 1) {
+              pointToAdd = 0.5;
+              pointReason = `재시험/미응시 24h내 통과 (${examState.cat})`;
+            }
+          } else if (!isRetake && status.startsWith("통과")) {
+            pointToAdd = 1;
+            pointReason = `단어 본시험 통과 (${examState.cat})`;
+          }
+
+          const examTag = isRetake ? "[재시험]" : "[본시험]";
+          const rangeStr = `${examTag} ${pureRange} (${mins}분${secs}초)`;
+
+          // 1) 단어시험 기록 저장
+          await safeInsert("vocab_tests", {
+            날짜: todayStr,
+            이름: examStudent,
+            점수: String(finalScore),
+            결과: status,
+            비고: rangeStr
+          });
+
+          // 2) 포인트 내역 저장
+          if (pointToAdd > 0) {
+            await safeInsert("points", {
+              날짜: todayStr,
+              이름: examStudent,
+              내역: pointReason,
+              포인트증감: String(pointToAdd)
+            });
+            pointAddedMsg = `✨ 축하합니다! ${pointReason}로 장학금 +${pointToAdd} 포인트를 획득했습니다!`;
+          }
+
+          // 3) 시험제출 자동출결 처리
+          const { data: attToday } = await db.from("attendance").select("*").eq("이름", examStudent).eq("날짜", todayStr);
+          if (!attToday || attToday.length === 0) {
+            const earlyReqExam = parseInt(stInfo["사전등원(분)"], 10) || 0;
+            const isMakeupToday = String(stInfo.보충일정 || "").includes(todayStr);
+            if (earlyReqExam === 0) {
+              await safeInsert("attendance", {
+                날짜: todayStr,
+                이름: examStudent,
+                출결: isMakeupToday ? "보충" : "출석",
+                등원시간: "-",
+                사전등원달성: "해당없음",
+                비고: "시험제출 자동출결"
+              });
+            }
+          }
+        }
+
+        if (examTimerInterval) clearInterval(examTimerInterval);
+        localStorage.removeItem("pqrs_active_exam_v2");
+
+        if (status.startsWith("통과")) {
+          confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+        }
+
+        showExamResultScreen(examState, finalScore, status, mins, secs, pointAddedMsg);
+        await loadStudentPersonalData(examStudent);
+
+      } catch (err) {
+        alert("제출 중 일시적인 네트워크 지연이 발생했습니다. 체크하신 답안은 그대로 보존되어 있으니 [최종 제출] 버튼을 한 번만 다시 눌러주세요! (" + err.message + ")");
+      } finally {
+        isSubmittingExam = false;
+        submitBtn.disabled = false;
+        submitBtn.textContent = "✅ 최종 제출 및 채점하기";
+      }
+    }
+
+    function showExamResultScreen(examState, finalScore, status, mins, secs, pointAddedMsg) {
+      document.getElementById("examPaperBox").classList.add("hidden");
+      document.getElementById("examSetupBox").classList.remove("hidden");
+
+      const resBox = document.getElementById("examResultBox");
+      resBox.classList.remove("hidden");
+
+      const wrongList = examState.questions.filter(q => q.selectedIdx !== q.correctIdx);
+      let wrongHtml = "";
+      if (wrongList.length === 0) {
+        wrongHtml = `<p class="text-sm font-bold text-emerald-700 text-center py-3">🎉 100점 만점입니다! 틀린 문제가 하나도 없습니다.</p>`;
+      } else {
+        wrongHtml = `
+          <div class="mt-3 pt-3 border-t border-slate-200">
+            <p class="text-xs font-extrabold text-rose-700 mb-2">📝 틀린 단어 오답 확인 (${wrongList.length}개)</p>
+            <div class="space-y-1.5 max-h-80 overflow-y-auto pr-1">
+              ${wrongList.map(w => {
+                const myChoiceText = w.options[w.selectedIdx] || "미선택";
+                return `
+                  <div class="text-xs bg-slate-50 p-2.5 rounded-lg border border-slate-200 flex justify-between items-center">
+                    <div><span class="font-extrabold text-slate-900 text-sm">${escapeHtml(w.영어단어)}</span> <span class="text-slate-400">(#${w.단어번호})</span></div>
+                    <div class="text-right">
+                      <span class="line-through text-rose-500 mr-2">${escapeHtml(myChoiceText)}</span>
+                      <span class="font-bold text-blue-900">👉 ${escapeHtml(w.정답뜻)}</span>
+                    </div>
+                  </div>
+                `;
+              }).join("")}
+            </div>
+          </div>
+        `;
+      }
+
+      const isPass = status.startsWith("통과");
+      resBox.innerHTML = `
+        <div class="text-center space-y-1">
+          <span class="inline-block px-3 py-1 rounded-full text-xs font-extrabold ${isPass ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">
+            ${examState.isPractice ? '🛠️ 연습 모드 채점 완료' : '🔥 실전 모드 성적 전송 완료!'}
+          </span>
+          <h3 class="text-3xl font-black ${isPass ? 'text-blue-900' : 'text-rose-600'} pt-1">${finalScore}점 <span class="text-lg">(${escapeHtml(status)})</span></h3>
+          <p class="text-xs text-slate-500">응시자: <b>${escapeHtml(examState.student)}</b> | 소요 시간: ${mins}분 ${secs}초</p>
+          ${pointAddedMsg ? `<p class="text-xs font-bold text-emerald-700 bg-emerald-50 py-2 px-3 rounded-lg mt-2">${escapeHtml(pointAddedMsg)}</p>` : ''}
+        </div>
+        ${wrongHtml}
+      `;
+      resBox.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    window.addEventListener("DOMContentLoaded", initApp);
+  </script>
+</body>
+</html>
