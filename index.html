@@ -4,6 +4,19 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>PQRS 영쌤 학생 학습센터</title>
+  <script>
+    // 💡 주소창의 학생 이름 꼬리표(?student=...) 자동 청소 및 카카오톡 외부 브라우저(사파리/크롬) 자동 전환
+    (function() {
+      const cleanUrl = window.location.origin + window.location.pathname;
+      if (window.location.search) {
+        window.history.replaceState({}, document.title, cleanUrl);
+      }
+      const ua = navigator.userAgent.toLowerCase();
+      if (ua.includes("kakaotalk")) {
+        window.location.href = "kakaotalk://web/openExternal?url=" + encodeURIComponent(cleanUrl);
+      }
+    })();
+  </script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
@@ -18,6 +31,12 @@
   </style>
 </head>
 <body class="min-h-screen pb-20">
+
+  <!-- 카카오톡에서 외부 브라우저로 자동 전환되지 못했을 때만 보이는 수동 버튼 배너 -->
+  <div id="kakaoFallbackBanner" class="hidden bg-yellow-400 text-slate-900 px-4 py-2.5 text-center text-xs font-extrabold shadow">
+    🌐 카카오톡 내부 창입니다. 안정적인 시험 응시를 위해 
+    <button onclick="openExternalFromKakao()" class="underline bg-slate-900 text-white px-2 py-1 rounded ml-1">👉 여기를 눌러 인터넷 창(사파리/크롬)으로 열기</button>
+  </div>
 
   <!-- 상단 고정 헤더 -->
   <header class="bg-blue-900 text-white shadow-md sticky top-0 z-30">
@@ -47,7 +66,7 @@
       <p class="mt-3 text-sm text-slate-600 font-bold">학원 데이터베이스에 연결 중입니다...</p>
     </div>
 
-    <!-- 학생 개인 요약 대시보드 (이름 선택 시 상단 고정 표시) -->
+    <!-- 학생 개인 요약 대시보드 -->
     <section id="studentDashboard" class="hidden mb-5 space-y-3">
       <div class="grid grid-cols-2 md:grid-cols-4 gap-2.5">
         <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
@@ -79,14 +98,14 @@
     <!-- 이름 미선택 안내창 -->
     <div id="noNameWarning" class="hidden bg-amber-50 border-2 border-amber-300 rounded-xl p-6 text-center my-6 shadow-sm">
       <p class="text-base md:text-lg font-extrabold text-amber-900">👆 화면 오른쪽 위에서 '내 이름'을 먼저 선택해 주세요!</p>
-      <p class="text-xs text-amber-700 mt-1.5">한 번 선택해 두면 스마트폰이 기억하여 다시 풀리지 않습니다.</p>
+      <p class="text-xs text-amber-700 mt-1.5">내 핸드폰에서 한 번 선택해 두면 다음부터는 내 이름으로 자동 유지됩니다.</p>
     </div>
 
     <!-- [탭 0] 장학금 포인트 랭킹 -->
     <section id="tabContent_rank" class="hidden space-y-4">
       <div class="bg-blue-50 border border-blue-200 rounded-xl p-3.5 text-xs md:text-sm text-blue-900">
         💡 <b>50포인트를 달성하면 25,000원의 장학금이 지급됩니다!</b><br>
-        <span class="text-xs text-blue-700">* 본시험 통과(+1P), 재시/미응시 24시간 내 통과(+0.5P), 과제 제출(+1P)</span>
+        <span class="text-xs text-blue-700">* 본시험 통과(+1P, 1일 1회 / 사전등원 지정자 2회), 재시/미응시 24시간 내 통과(+0.5P), 과제 제출(+1P)</span>
       </div>
 
       <div id="honorBox" class="hidden bg-amber-50 border-2 border-amber-300 rounded-xl p-4 text-center">
@@ -180,7 +199,7 @@
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <label class="flex items-center space-x-2 border rounded-lg p-2.5 cursor-pointer bg-slate-50">
               <input type="radio" name="examMode" value="practice" checked class="w-4 h-4 text-blue-900">
-              <span class="text-xs font-bold text-slate-800">🛠️ 연습 모드 <span class="font-normal text-slate-500">(성적 미기록·테스트용)</span></span>
+              <span class="text-xs font-bold text-slate-800">🛠️ 연습 모드 <span class="font-normal text-slate-500">(성적 미기록·가볍게 테스트용)</span></span>
             </label>
             <label class="flex items-center space-x-2 border-2 border-rose-300 rounded-lg p-2.5 cursor-pointer bg-rose-50/60">
               <input type="radio" name="examMode" value="real" class="w-4 h-4 text-rose-600">
@@ -224,25 +243,23 @@
     const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBramVpYWl2a2xrZ2FocmFoYXl3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5NzA5MjksImV4cCI6MjEwNzU0NjkyOX0.I_Yyjkdsy1S-_tW8q_FbLqsLWH_c2JyDjTgxi8fJamY";
     const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+    // 같은 범위를 통과한 뒤 다시 실전 모드로 응시할 수 있는 최소 간격(7일) -> 2주 뒤 누적 복습 시험은 정상 허용
+    const SAME_RANGE_COOLDOWN_DAYS = 7;
+
     let allStudents = [];
     let allWordbook = [];
     let allPoints = [];
     let myVocabTests = [];
     let myRetakes = [];
 
-    // URL 파라미터와 스마트폰 저장소(localStorage) 이중 연동
-    const urlParams = new URLSearchParams(window.location.search);
-    let currentStudent = urlParams.get("student") || localStorage.getItem("pqrs_student") || "";
-    let currentTab = urlParams.get("tab") || localStorage.getItem("pqrs_tab") || "rank";
+    let currentStudent = localStorage.getItem("pqrs_student") || "";
+    let currentTab = localStorage.getItem("pqrs_tab") || "rank";
     let examTimerInterval = null;
     let isSubmittingExam = false;
 
-    function syncUrlParams() {
-      const params = new URLSearchParams();
-      if (currentStudent) params.set("student", currentStudent);
-      if (currentTab) params.set("tab", currentTab);
-      const newUrl = `${window.location.pathname}?${params.toString()}`;
-      window.history.replaceState({}, "", newUrl);
+    function openExternalFromKakao() {
+      const cleanUrl = window.location.origin + window.location.pathname;
+      window.location.href = "kakaotalk://web/openExternal?url=" + encodeURIComponent(cleanUrl);
     }
 
     function getKSTDateString() {
@@ -253,6 +270,12 @@
       const mm = String(kstTime.getMonth() + 1).padStart(2, '0');
       const dd = String(kstTime.getDate()).padStart(2, '0');
       return `${yyyy}-${mm}-${dd}`;
+    }
+
+    function getDaysDiff(dateStr1, dateStr2) {
+      const d1 = new Date(dateStr1);
+      const d2 = new Date(dateStr2);
+      return Math.round((d1 - d2) / (1000 * 60 * 60 * 24));
     }
 
     function escapeHtml(str) {
@@ -278,7 +301,6 @@
       } catch (e) { return text; }
     }
 
-    // 단어장이 몇천 개든 누락 없이 100% 다 가져오는 자동 페이지네이션 함수
     async function fetchAllRows(tableName, selectCols = "*") {
       let allData = [];
       let from = 0;
@@ -294,7 +316,6 @@
       return allData;
     }
 
-    // 네트워크 흔들림 시 4회 자동 재시도 저장 함수
     async function safeInsert(tableName, rowObj, retries = 4) {
       for (let i = 0; i < retries; i++) {
         const { error } = await db.from(tableName).insert(rowObj);
@@ -309,6 +330,10 @@
     // 2. 초기 데이터 로드
     // ==========================================
     async function initApp() {
+      if (navigator.userAgent.toLowerCase().includes("kakaotalk")) {
+        document.getElementById("kakaoFallbackBanner").classList.remove("hidden");
+      }
+
       try {
         const [stData, ptData, wbData] = await Promise.all([
           fetchAllRows("students", "*"),
@@ -398,12 +423,10 @@
       currentStudent = selected;
       if (selected) {
         localStorage.setItem("pqrs_student", selected);
-        syncUrlParams();
         await loadStudentPersonalData(selected);
         restoreOngoingExamIfAny();
       } else {
         localStorage.removeItem("pqrs_student");
-        syncUrlParams();
         document.getElementById("studentDashboard").classList.add("hidden");
       }
       switchTab(currentTab);
@@ -434,7 +457,7 @@
       const absC = attData.filter(x => x.출결 === "결석").length;
       const earlyC = attData.filter(x => x.사전등원달성 === "성공").length;
       let attHtml = `출석 ${attC} / 보충 ${mkC}<br>지각 ${lateC} / 결석 ${absC}`;
-      if (earlyReq > 0) attHtml += `<br><span class="text-indigo-700">일찍오기 성공: ${earlyC}회</span>`;
+      if (earlyReq > 0) attHtml += `<br><span class="text-indigo-700">일찍오기 성공: ${earlyC}회 (본시험 포인트 1일 2회 가능)</span>`;
       document.getElementById("myAttText").innerHTML = attHtml;
 
       myVocabTests = vocRes.data || [];
@@ -530,7 +553,6 @@
     function switchTab(tabName) {
       currentTab = tabName;
       localStorage.setItem("pqrs_tab", tabName);
-      syncUrlParams();
 
       ["rank", "flash", "exam"].forEach(t => {
         const btn = document.getElementById(`tabBtn_${t}`);
@@ -629,7 +651,7 @@
     }
 
     // ==========================================
-    // 5. 실전 단어시험 (선지 번호 잠금 방식으로 버그 100% 차단)
+    // 5. 실전 단어시험 (일반 1일 1회 / 사전등원자 1일 2회 포인트 지급)
     // ==========================================
     function shuffleArray(arr) {
       const copy = [...arr];
@@ -640,7 +662,7 @@
       return copy;
     }
 
-    function startExam() {
+    async function startExam() {
       if (!currentStudent) {
         alert("화면 오른쪽 위에서 '내 이름'을 먼저 선택해 주세요!");
         return;
@@ -650,6 +672,23 @@
       const eNum = parseInt(document.getElementById("examEnd").value, 10) || 0;
       const qCount = parseInt(document.getElementById("examCount").value, 10) || 50;
       const mode = document.querySelector('input[name="examMode"]:checked').value;
+      const pureRange = `${cat} ${sNum}~${eNum}번`;
+      const todayStr = getKSTDateString();
+
+      // 최근 7일 이내에 이미 '통과'한 똑같은 범위만 단기 중복 응시 차단 (2주 뒤 복습 시험은 정상 허용)
+      if (mode === "real") {
+        const recentPassed = myVocabTests.find(v => {
+          if (extractPureRange(v.비고) !== pureRange) return false;
+          if (!String(v.결과 || "").startsWith("통과")) return false;
+          const diff = getDaysDiff(todayStr, v.날짜);
+          return diff >= 0 && diff < SAME_RANGE_COOLDOWN_DAYS;
+        });
+
+        if (recentPassed) {
+          alert(`🚨 [${pureRange}] 범위는 최근(${recentPassed.날짜})에 이미 '통과'한 시험입니다!\n\n• 동일한 범위는 통과한 날로부터 ${SAME_RANGE_COOLDOWN_DAYS}일이 지난 뒤(2주 뒤 복습 시험 등) 다시 실전 모드로 응시할 수 있습니다.\n• 지금 바로 자율 복습을 원하시면 '🛠️ 연습 모드'를 선택해 주세요!`);
+          return;
+        }
+      }
 
       const pool = allWordbook.filter(w => w.분류 === cat && w.단어번호 >= sNum && w.단어번호 <= eNum);
       if (pool.length < qCount) {
@@ -660,7 +699,6 @@
       const allMeanings = [...new Set(allWordbook.map(w => w.뜻).filter(Boolean))];
       const sampled = shuffleArray(pool).slice(0, qCount);
 
-      // 💡 [핵심 방어] 시험 시작 시점에 5지선다 보기를 딱 1번만 생성하고, 정답 번호(correctIdx)를 숫자로 영구 고정!
       const questions = sampled.map((q, idx) => {
         const wrongPool = allMeanings.filter(m => m !== q.뜻);
         const wrongs = shuffleArray(wrongPool).slice(0, 4);
@@ -674,7 +712,7 @@
           정답뜻: q.뜻,
           options: options,
           correctIdx: correctIdx,
-          selectedIdx: null // 학생이 선택한 선지 번호 (0~4)
+          selectedIdx: null
         };
       });
 
@@ -758,7 +796,7 @@
               <span class="text-blue-800 mr-1">Q${q.idx}.</span> '${escapeHtml(q.영어단어)}'의 알맞은 뜻은?
             </p>
             <span id="qStatus_${qIndex}" class="text-[11px] font-bold px-2 py-0.5 rounded ${q.selectedIdx !== null ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-500'}">
-              ${q.selectedIdx !== null ? '✓ 선택됨' : '미선택'}
+              ${q.selectedIdx !== null ? `✓ ${q.selectedIdx + 1}번 선택됨` : '미선택'}
             </span>
           </div>
           <div class="space-y-2">${optsHtml}</div>
@@ -773,7 +811,6 @@
       examTimerInterval = setInterval(() => updateTimerDisplay(examState.startTime), 1000);
     }
 
-    // 💡 학생이 선지를 터치했을 때 선지 재렌더링 없이 즉시 번호(0~4)만 잠금 저장
     function selectAnswerOption(qIndex, optIndex) {
       const saved = localStorage.getItem("pqrs_active_exam_v2");
       if (!saved) return;
@@ -783,7 +820,6 @@
       examState.questions[qIndex].selectedIdx = optIndex;
       localStorage.setItem("pqrs_active_exam_v2", JSON.stringify(examState));
 
-      // 해당 문항의 버튼 스타일만 즉시 업데이트 (스크롤 튐·선지 바뀜 원천 차단)
       for (let i = 0; i < 5; i++) {
         const btn = document.getElementById(`optBtn_${qIndex}_${i}`);
         const circle = document.getElementById(`optCircle_${qIndex}_${i}`);
@@ -840,7 +876,6 @@
       if (!saved) return;
       const examState = JSON.parse(saved);
 
-      // 미응답 문항 번호(selectedIdx === null) 정확히 체크
       const unanswered = [];
       examState.questions.forEach((q, idx) => {
         if (q.selectedIdx === null || q.selectedIdx === undefined) unanswered.push(idx);
@@ -870,6 +905,10 @@
         const stInfo = allStudents.find(s => s.이름 === examStudent) || {};
         const missRate = parseInt(stInfo.오답허용률, 10) || 10;
         const passCutoff = 100 - missRate;
+        const earlyReqExam = parseInt(stInfo["사전등원(분)"], 10) || 0;
+
+        // 💡 [핵심 규칙] 일반 학생은 본시험 장학금 하루 1회, 선생님께서 지정한 사전등원(30분/60분 전) 학생은 하루 최대 2회!
+        const maxDailyRegularPoints = earlyReqExam > 0 ? 2 : 1;
 
         const elapsedSecs = Math.floor((Date.now() - examState.startTime) / 1000);
         const mins = Math.floor(elapsedSecs / 60);
@@ -885,34 +924,72 @@
         let pointAddedMsg = "";
 
         if (!examState.isPractice) {
-          const pastFails = myVocabTests.filter(v =>
-            v.이름 === examStudent &&
-            String(v.비고 || "").includes(pureRange) &&
-            (String(v.결과 || "").includes("미통과") || String(v.결과 || "").includes("미응시"))
-          );
+          // 제출 직전 서버 최신 시험 기록과 오늘 받은 포인트 기록을 동시에 조회
+          const [vocLatestRes, ptTodayRes] = await Promise.all([
+            db.from("vocab_tests").select("날짜, 이름, 점수, 결과, 비고").eq("이름", examStudent),
+            db.from("points").select("날짜, 이름, 내역, 포인트증감").eq("이름", examStudent).eq("날짜", todayStr)
+          ]);
 
-          const isRetake = pastFails.length > 0;
+          const freshTests = vocLatestRes.data || myVocabTests;
+          const todayPointsList = ptTodayRes.data || [];
+
+          // 동일 범위의 과거 응시 내역만 추출 후 날짜순 정렬
+          const sameRangeHistory = freshTests
+            .filter(v => extractPureRange(v.비고) === pureRange)
+            .sort((a, b) => String(a.날짜).localeCompare(String(b.날짜)));
+
+          // 1) 최근 7일 이내에 이미 '통과'한 동일 범위인지 확인 (당일 중복 제출 방지)
+          const recentPassedNow = sameRangeHistory.find(v => {
+            if (!String(v.결과 || "").startsWith("통과")) return false;
+            const diff = getDaysDiff(todayStr, v.날짜);
+            return diff >= 0 && diff < SAME_RANGE_COOLDOWN_DAYS;
+          });
+
+          if (recentPassedNow) {
+            alert(`🚨 [${pureRange}] 범위는 최근(${recentPassedNow.날짜})에 이미 통과 처리된 시험입니다! 중복 제출이 차단되었습니다.`);
+            if (examTimerInterval) clearInterval(examTimerInterval);
+            localStorage.removeItem("pqrs_active_exam_v2");
+            document.getElementById("examPaperBox").classList.add("hidden");
+            document.getElementById("examSetupBox").classList.remove("hidden");
+            await loadStudentPersonalData(examStudent);
+            return;
+          }
+
+          // 2) 가장 마지막 응시 결과가 '미통과/미응시'일 때만 [재시험]으로 판정
+          const lastAttempt = sameRangeHistory.length > 0 ? sameRangeHistory[sameRangeHistory.length - 1] : null;
+          const isRetake = lastAttempt
+            ? (String(lastAttempt.결과 || "").includes("미통과") || String(lastAttempt.결과 || "").includes("미응시"))
+            : false;
+
           let pointToAdd = 0;
           let pointReason = "";
 
           if (isRetake && status.startsWith("통과")) {
-            const lastFailDateStr = pastFails[pastFails.length - 1].날짜;
-            const d1 = new Date(todayStr);
-            const d2 = new Date(lastFailDateStr);
-            const diffDays = Math.round((d1 - d2) / (1000 * 60 * 60 * 24));
+            const diffDays = getDaysDiff(todayStr, lastAttempt.날짜);
             if (diffDays <= 1) {
               pointToAdd = 0.5;
-              pointReason = `재시험/미응시 24h내 통과 (${examState.cat})`;
+              pointReason = `재시험/미응시 24h내 통과 (${pureRange})`;
             }
           } else if (!isRetake && status.startsWith("통과")) {
-            pointToAdd = 1;
-            pointReason = `단어 본시험 통과 (${examState.cat})`;
+            // 오늘 '단어 본시험 통과'로 포인트를 몇 번 받았는지 카운트
+            const todayRegularPointCount = todayPointsList.filter(p =>
+              String(p.내역 || "").includes("단어 본시험 통과")
+            ).length;
+
+            if (todayRegularPointCount < maxDailyRegularPoints) {
+              pointToAdd = 1;
+              pointReason = `단어 본시험 통과 (${pureRange})`;
+            } else {
+              pointToAdd = 0;
+              const limitLabel = earlyReqExam > 0 ? "사전등원 대상자 1일 최대 2회" : "일반 학생 1일 1회";
+              pointAddedMsg = `ℹ️ 시험 통과 기록은 정상 전송되었으나, 오늘 본시험 장학금 포인트 지급 한도(${limitLabel})를 이미 달성하여 추가 포인트는 지급되지 않았습니다.`;
+            }
           }
 
           const examTag = isRetake ? "[재시험]" : "[본시험]";
           const rangeStr = `${examTag} ${pureRange} (${mins}분${secs}초)`;
 
-          // 1) 단어시험 기록 저장
+          // 단어시험 성적 기록 저장 (포인트 한도와 무관하게 시험 결과는 항상 기록됨)
           await safeInsert("vocab_tests", {
             날짜: todayStr,
             이름: examStudent,
@@ -921,7 +998,7 @@
             비고: rangeStr
           });
 
-          // 2) 포인트 내역 저장
+          // 포인트 내역 저장
           if (pointToAdd > 0) {
             await safeInsert("points", {
               날짜: todayStr,
@@ -932,10 +1009,9 @@
             pointAddedMsg = `✨ 축하합니다! ${pointReason}로 장학금 +${pointToAdd} 포인트를 획득했습니다!`;
           }
 
-          // 3) 시험제출 자동출결 처리
+          // 시험제출 자동출결 처리
           const { data: attToday } = await db.from("attendance").select("*").eq("이름", examStudent).eq("날짜", todayStr);
           if (!attToday || attToday.length === 0) {
-            const earlyReqExam = parseInt(stInfo["사전등원(분)"], 10) || 0;
             const isMakeupToday = String(stInfo.보충일정 || "").includes(todayStr);
             if (earlyReqExam === 0) {
               await safeInsert("attendance", {
@@ -1003,6 +1079,10 @@
       }
 
       const isPass = status.startsWith("통과");
+      const msgColorClass = pointAddedMsg.startsWith("✨")
+        ? "text-emerald-700 bg-emerald-50 border border-emerald-200"
+        : "text-slate-700 bg-slate-100 border border-slate-300";
+
       resBox.innerHTML = `
         <div class="text-center space-y-1">
           <span class="inline-block px-3 py-1 rounded-full text-xs font-extrabold ${isPass ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">
@@ -1010,7 +1090,7 @@
           </span>
           <h3 class="text-3xl font-black ${isPass ? 'text-blue-900' : 'text-rose-600'} pt-1">${finalScore}점 <span class="text-lg">(${escapeHtml(status)})</span></h3>
           <p class="text-xs text-slate-500">응시자: <b>${escapeHtml(examState.student)}</b> | 소요 시간: ${mins}분 ${secs}초</p>
-          ${pointAddedMsg ? `<p class="text-xs font-bold text-emerald-700 bg-emerald-50 py-2 px-3 rounded-lg mt-2">${escapeHtml(pointAddedMsg)}</p>` : ''}
+          ${pointAddedMsg ? `<p class="text-xs font-bold ${msgColorClass} py-2.5 px-3 rounded-lg mt-2">${escapeHtml(pointAddedMsg)}</p>` : ''}
         </div>
         ${wrongHtml}
       `;
