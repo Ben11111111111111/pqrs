@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>PQRS 영쌤 학생 학습센터</title>
   <script>
-    // 💡 주소창의 학생 이름 꼬리표(?student=...) 자동 청소 및 카카오톡 외부 브라우저(사파리/크롬) 자동 전환
     (function() {
       const cleanUrl = window.location.origin + window.location.pathname;
       if (window.location.search) {
@@ -32,13 +31,11 @@
 </head>
 <body class="min-h-screen pb-20">
 
-  <!-- 카카오톡에서 외부 브라우저로 자동 전환되지 못했을 때만 보이는 수동 버튼 배너 -->
   <div id="kakaoFallbackBanner" class="hidden bg-yellow-400 text-slate-900 px-4 py-2.5 text-center text-xs font-extrabold shadow">
     🌐 카카오톡 내부 창입니다. 안정적인 시험 응시를 위해 
     <button onclick="openExternalFromKakao()" class="underline bg-slate-900 text-white px-2 py-1 rounded ml-1">👉 여기를 눌러 인터넷 창(사파리/크롬)으로 열기</button>
   </div>
 
-  <!-- 상단 고정 헤더 -->
   <header class="bg-blue-900 text-white shadow-md sticky top-0 z-30">
     <div class="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
       <div class="flex items-center space-x-2">
@@ -51,7 +48,6 @@
         </select>
       </div>
     </div>
-    <!-- 메뉴 탭 -->
     <div class="max-w-4xl mx-auto px-2 flex border-t border-blue-800 bg-blue-950 text-xs md:text-sm font-semibold">
       <button onclick="switchTab('rank')" id="tabBtn_rank" class="flex-1 py-3 text-center border-b-4 border-yellow-400 text-yellow-300">🏆 포인트 랭킹</button>
       <button onclick="switchTab('flash')" id="tabBtn_flash" class="flex-1 py-3 text-center border-b-4 border-transparent text-blue-200">📇 단어 암기장</button>
@@ -60,13 +56,11 @@
   </header>
 
   <main class="max-w-4xl mx-auto px-4 pt-4">
-    <!-- 초기 로딩 표시 -->
     <div id="globalLoader" class="text-center py-14">
       <div class="inline-block animate-spin rounded-full h-9 w-9 border-4 border-blue-900 border-t-transparent"></div>
       <p class="mt-3 text-sm text-slate-600 font-bold">학원 데이터베이스에 연결 중입니다...</p>
     </div>
 
-    <!-- 학생 개인 요약 대시보드 -->
     <section id="studentDashboard" class="hidden mb-5 space-y-3">
       <div class="grid grid-cols-2 md:grid-cols-4 gap-2.5">
         <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
@@ -84,7 +78,6 @@
         </div>
       </div>
 
-      <!-- 주간 진도표 -->
       <div id="weeklyProgressBox" class="hidden bg-indigo-50 border border-indigo-200 rounded-xl p-3.5">
         <p id="weeklyTitle" class="text-xs font-bold text-indigo-900 mb-2">📢 나의 이번 주 학습 진도 및 단어 범위</p>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
@@ -95,17 +88,15 @@
       </div>
     </section>
 
-    <!-- 이름 미선택 안내창 -->
     <div id="noNameWarning" class="hidden bg-amber-50 border-2 border-amber-300 rounded-xl p-6 text-center my-6 shadow-sm">
       <p class="text-base md:text-lg font-extrabold text-amber-900">👆 화면 오른쪽 위에서 '내 이름'을 먼저 선택해 주세요!</p>
       <p class="text-xs text-amber-700 mt-1.5">내 핸드폰에서 한 번 선택해 두면 다음부터는 내 이름으로 자동 유지됩니다.</p>
     </div>
 
-    <!-- [탭 0] 장학금 포인트 랭킹 -->
     <section id="tabContent_rank" class="hidden space-y-4">
       <div class="bg-blue-50 border border-blue-200 rounded-xl p-3.5 text-xs md:text-sm text-blue-900">
         💡 <b>50포인트를 달성하면 25,000원의 장학금이 지급됩니다!</b><br>
-        <span class="text-xs text-blue-700">* 본시험 통과(+1P, 1일 1회 / 사전등원 지정자 2회), 재시/미응시 24시간 내 통과(+0.5P), 과제 제출(+1P)</span>
+        <span class="text-xs text-blue-700">* 본시험 통과(+1P, 일반 1회 / 사전등원 요일 2회), 재시 24h내 통과(+0.5P), 과제 제출(+1P), 클리닉 통과(+1P)</span>
       </div>
 
       <div id="honorBox" class="hidden bg-amber-50 border-2 border-amber-300 rounded-xl p-4 text-center">
@@ -132,10 +123,12 @@
       </div>
     </section>
 
-    <!-- [탭 1] 단어 암기장 (플래시카드) -->
     <section id="tabContent_flash" class="hidden space-y-4">
       <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-        <h2 class="text-base font-bold text-slate-800 mb-3">📇 스마트 단어 암기장</h2>
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-base font-bold text-slate-800">📇 스마트 단어 암기장</h2>
+          <button onclick="forceRefreshWordbook()" class="text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold px-2.5 py-1 rounded border border-slate-300">🔄 단어장 새로고침</button>
+        </div>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div>
             <label class="block text-xs font-bold text-slate-600 mb-1">학습할 단어장</label>
@@ -157,17 +150,17 @@
       <div id="flashcardsContainer" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5"></div>
     </section>
 
-    <!-- [탭 2] 실전 단어 시험 (객관식) -->
     <section id="tabContent_exam" class="hidden space-y-4">
-      <!-- 재시 바로가기 목록 -->
       <div id="examRetakeQuickBox" class="hidden bg-rose-50 border-2 border-rose-300 rounded-xl p-3.5 space-y-2">
         <p class="text-xs font-extrabold text-rose-800">🚨 아직 통과하지 못한 단어시험(또는 미응시)이 있습니다. 아래 버튼을 누르면 범위가 자동 입력됩니다!</p>
         <div id="examRetakeButtons" class="space-y-1.5"></div>
       </div>
 
-      <!-- 시험 설정 박스 -->
       <div id="examSetupBox" class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-        <h2 class="text-base font-bold text-slate-800 mb-3">⏱️ 온라인 단어 시험 설정</h2>
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-base font-bold text-slate-800">⏱️ 온라인 단어 시험 설정</h2>
+          <button onclick="forceRefreshWordbook()" class="text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold px-2.5 py-1 rounded border border-slate-300">🔄 단어장 새로고침</button>
+        </div>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div class="col-span-2 md:col-span-1">
             <label class="block text-xs font-bold text-slate-600 mb-1">단어장 선택</label>
@@ -184,7 +177,11 @@
           <div class="col-span-2 md:col-span-1">
             <label class="block text-xs font-bold text-slate-600 mb-1">문항 수</label>
             <select id="examCount" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-medium">
+              <option value="10">10문항</option>
+              <option value="20">20문항</option>
+              <option value="30">30문항</option>
               <option value="50" selected>50문항</option>
+              <option value="80">80문항</option>
               <option value="100">100문항</option>
             </select>
           </div>
@@ -207,7 +204,6 @@
         <button onclick="startExam()" class="mt-4 w-full bg-blue-900 hover:bg-blue-800 text-white font-extrabold py-3.5 rounded-xl text-sm shadow transition">🚀 시험 시작하기!</button>
       </div>
 
-      <!-- 진행 중인 시험지 영역 -->
       <div id="examPaperBox" class="hidden space-y-4">
         <div class="bg-slate-900 text-white p-3.5 rounded-xl sticky top-[104px] z-20 flex items-center justify-between shadow-lg">
           <div>
@@ -226,21 +222,19 @@
         <button id="submitExamBtn" onclick="submitExam()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-4 rounded-xl text-base shadow-lg transition">✅ 최종 제출 및 채점하기</button>
       </div>
 
-      <!-- 시험 결과 및 오답노트 영역 -->
       <div id="examResultBox" class="hidden bg-white p-5 rounded-xl shadow-md border-2 border-blue-900 space-y-4"></div>
     </section>
   </main>
 
   <script>
-    // ==========================================
-    // 1. Supabase 연결 설정
-    // ==========================================
     const SUPABASE_URL = "https://pkjeiaivklkgahrahayw.supabase.co";
     const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBramVpYWl2a2xrZ2FocmFoYXl3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5NzA5MjksImV4cCI6MjEwNzU0NjkyOX0.I_Yyjkdsy1S-_tW8q_FbLqsLWH_c2JyDjTgxi8fJamY";
     const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // 같은 범위를 통과한 뒤 다시 실전 모드로 응시할 수 있는 최소 간격(7일) -> 2주 뒤 누적 복습 시험은 정상 허용
     const SAME_RANGE_COOLDOWN_DAYS = 7;
+    const WORDBOOK_CACHE_KEY = "pqrs_wb_cache_v1";
+    const WORDBOOK_CACHE_TIME_KEY = "pqrs_wb_cache_time_v1";
+    const WORDBOOK_CACHE_TTL_MS = 30 * 60 * 1000; // 30분 캐싱
 
     let allStudents = [];
     let allWordbook = [];
@@ -258,14 +252,84 @@
       window.location.href = "kakaotalk://web/openExternal?url=" + encodeURIComponent(cleanUrl);
     }
 
-    function getKSTDateString() {
+    function getKSTNow() {
       const now = new Date();
       const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
-      const kstTime = new Date(utc + (9 * 3600000));
+      return new Date(utc + (9 * 3600000));
+    }
+
+    function getKSTDateString() {
+      const kstTime = getKSTNow();
       const yyyy = kstTime.getFullYear();
       const mm = String(kstTime.getMonth() + 1).padStart(2, '0');
       const dd = String(kstTime.getDate()).padStart(2, '0');
       return `${yyyy}-${mm}-${dd}`;
+    }
+
+    function getKSTWeekdayKr() {
+      const days = ["일", "월", "화", "수", "목", "금", "토"];
+      return days[getKSTNow().getDay()];
+    }
+
+    function getTodayEarlyMinutes(stInfo) {
+      if (!stInfo) return 0;
+      const todayStr = getKSTDateString();
+      const todayWk = getKSTWeekdayKr();
+      const makeupStr = String(stInfo.보충일정 || "");
+
+      if (makeupStr.includes(todayStr)) {
+        for (const item of makeupStr.split(",")) {
+          const s = item.trim();
+          if (s.startsWith(todayStr) && s.includes("(") && s.includes(")")) {
+            const inner = s.split("(")[1].replace(")", "").trim();
+            if (inner.includes("/")) {
+              return parseInt(inner.split("/")[1], 10) || 0;
+            }
+            return 0;
+          }
+        }
+      }
+
+      const schedStr = String(stInfo.등원일정 || "").trim();
+      const legacyEarly = parseInt(stInfo["사전등원(분)"], 10) || 0;
+      if (schedStr) {
+        const hasSlash = schedStr.includes("/");
+        for (const item of schedStr.split(",")) {
+          const s = item.trim();
+          if (s.startsWith(todayWk) && s.includes("(") && s.includes(")")) {
+            const inner = s.split("(")[1].replace(")", "").trim();
+            if (inner.includes("/")) {
+              return parseInt(inner.split("/")[1], 10) || 0;
+            }
+            return hasSlash ? 0 : legacyEarly;
+          }
+        }
+        return 0;
+      }
+      return legacyEarly;
+    }
+
+    function getEarlyDaysSummaryText(stInfo) {
+      if (!stInfo) return "";
+      const schedStr = String(stInfo.등원일정 || "").trim();
+      const legacyEarly = parseInt(stInfo["사전등원(분)"], 10) || 0;
+      if (!schedStr) return legacyEarly > 0 ? `사전등원(${legacyEarly}분전)` : "";
+      const hasSlash = schedStr.includes("/");
+      const list = [];
+      for (const item of schedStr.split(",")) {
+        const s = item.trim();
+        if (s.includes("(") && s.includes(")")) {
+          const d = s.split("(")[0].trim();
+          const inner = s.split("(")[1].replace(")", "").trim();
+          if (inner.includes("/")) {
+            const eVal = parseInt(inner.split("/")[1], 10) || 0;
+            if (eVal > 0) list.push(`${d}(${eVal}분전)`);
+          } else if (!hasSlash && legacyEarly > 0) {
+            list.push(`${d}(${legacyEarly}분전)`);
+          }
+        }
+      }
+      return list.join(", ");
     }
 
     function getDaysDiff(dateStr1, dateStr2) {
@@ -312,6 +376,43 @@
       return allData;
     }
 
+    async function loadWordbookSmart(forceRefresh = false) {
+      if (!forceRefresh) {
+        try {
+          const cachedTime = parseInt(localStorage.getItem(WORDBOOK_CACHE_TIME_KEY), 10) || 0;
+          const cachedJson = localStorage.getItem(WORDBOOK_CACHE_KEY);
+          if (cachedJson && (Date.now() - cachedTime < WORDBOOK_CACHE_TTL_MS)) {
+            const parsed = JSON.parse(cachedJson);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              return parsed;
+            }
+          }
+        } catch (e) {}
+      }
+      const wbData = await fetchAllRows("wordbook", "*");
+      const formatted = (wbData || []).map(w => ({
+        ...w,
+        단어번호: parseInt(w.단어번호, 10) || 0,
+        영어단어: String(w.영어단어 ?? "").trim(),
+        뜻: String(w.뜻 ?? "").trim()
+      }));
+      try {
+        localStorage.setItem(WORDBOOK_CACHE_KEY, JSON.stringify(formatted));
+        localStorage.setItem(WORDBOOK_CACHE_TIME_KEY, String(Date.now()));
+      } catch (e) {}
+      return formatted;
+    }
+
+    async function forceRefreshWordbook() {
+      try {
+        allWordbook = await loadWordbookSmart(true);
+        initWordbookCategories();
+        alert("✅ 최신 단어장 데이터를 성공적으로 불러왔습니다!");
+      } catch (e) {
+        alert("단어장 새로고침 실패: " + e.message);
+      }
+    }
+
     async function safeInsert(tableName, rowObj, retries = 4) {
       for (let i = 0; i < retries; i++) {
         const { error } = await db.from(tableName).insert(rowObj);
@@ -322,9 +423,6 @@
       return false;
     }
 
-    // ==========================================
-    // 2. 초기 데이터 로드
-    // ==========================================
     async function initApp() {
       if (navigator.userAgent.toLowerCase().includes("kakaotalk")) {
         document.getElementById("kakaoFallbackBanner").classList.remove("hidden");
@@ -334,17 +432,12 @@
         const [stData, ptData, wbData] = await Promise.all([
           fetchAllRows("students", "*"),
           fetchAllRows("points", "이름, 포인트증감"),
-          fetchAllRows("wordbook", "*")
+          loadWordbookSmart(false)
         ]);
 
         allStudents = stData || [];
         allPoints = ptData || [];
-        allWordbook = (wbData || []).map(w => ({
-          ...w,
-          단어번호: parseInt(w.단어번호, 10) || 0,
-          영어단어: String(w.영어단어 ?? "").trim(),
-          뜻: String(w.뜻 ?? "").trim()
-        }));
+        allWordbook = wbData || [];
 
         const activeList = allStudents.filter(s => s.상태 === "재원").map(s => s.이름).sort();
         const selectEl = document.getElementById("studentSelect");
@@ -411,9 +504,6 @@
       document.getElementById("examEnd").value = Math.max(...nums);
     }
 
-    // ==========================================
-    // 3. 학생 선택 및 개인 데이터 업데이트
-    // ==========================================
     async function onStudentChange() {
       const selected = document.getElementById("studentSelect").value;
       currentStudent = selected;
@@ -433,7 +523,7 @@
       const stInfo = allStudents.find(s => s.이름 === stName) || {};
       const myGradeRaw = String(stInfo.학년 || "");
       const myGrade = myGradeRaw ? myGradeRaw.replace(/고|학년/g, "").trim() + "학년" : "";
-      const earlyReq = parseInt(stInfo["사전등원(분)"], 10) || 0;
+      const earlySummaryText = getEarlyDaysSummaryText(stInfo);
 
       const [ptRes, attRes, vocRes, hwRes, wkRes] = await Promise.all([
         db.from("points").select("포인트증감").eq("이름", stName),
@@ -453,7 +543,9 @@
       const absC = attData.filter(x => x.출결 === "결석").length;
       const earlyC = attData.filter(x => x.사전등원달성 === "성공").length;
       let attHtml = `출석 ${attC} / 보충 ${mkC}<br>지각 ${lateC} / 결석 ${absC}`;
-      if (earlyReq > 0) attHtml += `<br><span class="text-indigo-700">일찍오기 성공: ${earlyC}회 (본시험 포인트 1일 2회 가능)</span>`;
+      if (earlySummaryText || earlyC > 0) {
+        attHtml += `<br><span class="text-indigo-700">일찍오기 성공: ${earlyC}회 ${earlySummaryText ? `[${escapeHtml(earlySummaryText)}]` : ''}</span>`;
+      }
       document.getElementById("myAttText").innerHTML = attHtml;
 
       myVocabTests = vocRes.data || [];
@@ -543,9 +635,6 @@
       }
     }
 
-    // ==========================================
-    // 4. 탭 전환 및 플래시카드
-    // ==========================================
     function switchTab(tabName) {
       currentTab = tabName;
       localStorage.setItem("pqrs_tab", tabName);
@@ -646,9 +735,6 @@
       });
     }
 
-    // ==========================================
-    // 5. 실전 단어시험 (일반 1일 1회 / 사전등원자 1일 2회 포인트 지급)
-    // ==========================================
     function shuffleArray(arr) {
       const copy = [...arr];
       for (let i = copy.length - 1; i > 0; i--) {
@@ -671,7 +757,6 @@
       const pureRange = `${cat} ${sNum}~${eNum}번`;
       const todayStr = getKSTDateString();
 
-      // 최근 7일 이내에 이미 '통과'한 똑같은 범위만 단기 중복 응시 차단 (2주 뒤 복습 시험은 정상 허용)
       if (mode === "real") {
         const recentPassed = myVocabTests.find(v => {
           if (extractPureRange(v.비고) !== pureRange) return false;
@@ -901,10 +986,9 @@
         const stInfo = allStudents.find(s => s.이름 === examStudent) || {};
         const missRate = parseInt(stInfo.오답허용률, 10) || 10;
         const passCutoff = 100 - missRate;
-        const earlyReqExam = parseInt(stInfo["사전등원(분)"], 10) || 0;
 
-        // 💡 [핵심 규칙] 일반 학생은 본시험 장학금 하루 1회, 선생님께서 지정한 사전등원(30분/60분 전) 학생은 하루 최대 2회!
-        const maxDailyRegularPoints = earlyReqExam > 0 ? 2 : 1;
+        const earlyReqToday = getTodayEarlyMinutes(stInfo);
+        const maxDailyRegularPoints = earlyReqToday > 0 ? 2 : 1;
 
         const elapsedSecs = Math.floor((Date.now() - examState.startTime) / 1000);
         const mins = Math.floor(elapsedSecs / 60);
@@ -920,7 +1004,6 @@
         let pointAddedMsg = "";
 
         if (!examState.isPractice) {
-          // 제출 직전 서버 최신 시험 기록과 오늘 받은 포인트 기록을 동시에 조회
           const [vocLatestRes, ptTodayRes] = await Promise.all([
             db.from("vocab_tests").select("날짜, 이름, 점수, 결과, 비고").eq("이름", examStudent),
             db.from("points").select("날짜, 이름, 내역, 포인트증감").eq("이름", examStudent).eq("날짜", todayStr)
@@ -929,12 +1012,10 @@
           const freshTests = vocLatestRes.data || myVocabTests;
           const todayPointsList = ptTodayRes.data || [];
 
-          // 동일 범위의 과거 응시 내역만 추출 후 날짜순 정렬
           const sameRangeHistory = freshTests
             .filter(v => extractPureRange(v.비고) === pureRange)
             .sort((a, b) => String(a.날짜).localeCompare(String(b.날짜)));
 
-          // 1) 최근 7일 이내에 이미 '통과'한 동일 범위인지 확인 (당일 중복 제출 방지)
           const recentPassedNow = sameRangeHistory.find(v => {
             if (!String(v.결과 || "").startsWith("통과")) return false;
             const diff = getDaysDiff(todayStr, v.날짜);
@@ -951,7 +1032,6 @@
             return;
           }
 
-          // 2) 가장 마지막 응시 결과가 '미통과/미응시'일 때만 [재시험]으로 판정
           const lastAttempt = sameRangeHistory.length > 0 ? sameRangeHistory[sameRangeHistory.length - 1] : null;
           const isRetake = lastAttempt
             ? (String(lastAttempt.결과 || "").includes("미통과") || String(lastAttempt.결과 || "").includes("미응시"))
@@ -967,7 +1047,6 @@
               pointReason = `재시험/미응시 24h내 통과 (${pureRange})`;
             }
           } else if (!isRetake && status.startsWith("통과")) {
-            // 오늘 '단어 본시험 통과'로 포인트를 몇 번 받았는지 카운트
             const todayRegularPointCount = todayPointsList.filter(p =>
               String(p.내역 || "").includes("단어 본시험 통과")
             ).length;
@@ -977,7 +1056,7 @@
               pointReason = `단어 본시험 통과 (${pureRange})`;
             } else {
               pointToAdd = 0;
-              const limitLabel = earlyReqExam > 0 ? "사전등원 대상자 1일 최대 2회" : "일반 학생 1일 1회";
+              const limitLabel = earlyReqToday > 0 ? "오늘 사전등원 요일 최대 2회" : "일반 등원일 1일 1회";
               pointAddedMsg = `ℹ️ 시험 통과 기록은 정상 전송되었으나, 오늘 본시험 장학금 포인트 지급 한도(${limitLabel})를 이미 달성하여 추가 포인트는 지급되지 않았습니다.`;
             }
           }
@@ -985,7 +1064,6 @@
           const examTag = isRetake ? "[재시험]" : "[본시험]";
           const rangeStr = `${examTag} ${pureRange} (${mins}분${secs}초)`;
 
-          // 단어시험 성적 기록 저장 (포인트 한도와 무관하게 시험 결과는 항상 기록됨)
           await safeInsert("vocab_tests", {
             날짜: todayStr,
             이름: examStudent,
@@ -994,22 +1072,23 @@
             비고: rangeStr
           });
 
-          // 포인트 내역 저장
           if (pointToAdd > 0) {
-            await safeInsert("points", {
-              날짜: todayStr,
-              이름: examStudent,
-              내역: pointReason,
-              포인트증감: String(pointToAdd)
-            });
-            pointAddedMsg = `✨ 축하합니다! ${pointReason}로 장학금 +${pointToAdd} 포인트를 획득했습니다!`;
+            const alreadySamePt = todayPointsList.some(p => String(p.내역 || "") === pointReason);
+            if (!alreadySamePt) {
+              await safeInsert("points", {
+                날짜: todayStr,
+                이름: examStudent,
+                내역: pointReason,
+                포인트증감: String(pointToAdd)
+              });
+              pointAddedMsg = `✨ 축하합니다! ${pointReason}로 장학금 +${pointToAdd} 포인트를 획득했습니다!`;
+            }
           }
 
-          // 시험제출 자동출결 처리
           const { data: attToday } = await db.from("attendance").select("*").eq("이름", examStudent).eq("날짜", todayStr);
           if (!attToday || attToday.length === 0) {
             const isMakeupToday = String(stInfo.보충일정 || "").includes(todayStr);
-            if (earlyReqExam === 0) {
+            if (earlyReqToday === 0) {
               await safeInsert("attendance", {
                 날짜: todayStr,
                 이름: examStudent,
