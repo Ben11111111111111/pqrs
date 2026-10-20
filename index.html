@@ -40,7 +40,10 @@
     <div class="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
       <div class="flex items-center space-x-2">
         <span class="text-2xl">🎓</span>
-        <h1 class="text-base md:text-xl font-bold tracking-tight">PQRS 영쌤 학습센터</h1>
+        <div>
+          <h1 class="text-base md:text-xl font-bold tracking-tight">PQRS 영쌤 학습센터</h1>
+          <p id="liveStudyTimeBadge" class="hidden text-[11px] text-yellow-300 font-bold">⏱️ 오늘 공부시간 측정중: 0분 00초</p>
+        </div>
       </div>
       <div class="flex items-center space-x-2">
         <select id="studentSelect" onchange="onStudentChange()" class="bg-white text-blue-950 font-extrabold text-sm rounded-lg px-3 py-2 border-2 border-yellow-400 focus:outline-none shadow-sm">
@@ -49,7 +52,7 @@
       </div>
     </div>
     <div class="max-w-4xl mx-auto px-2 flex border-t border-blue-800 bg-blue-950 text-xs md:text-sm font-semibold">
-      <button onclick="switchTab('rank')" id="tabBtn_rank" class="flex-1 py-3 text-center border-b-4 border-yellow-400 text-yellow-300">🏆 포인트 랭킹</button>
+      <button onclick="switchTab('rank')" id="tabBtn_rank" class="flex-1 py-3 text-center border-b-4 border-yellow-400 text-yellow-300">🏆 랭킹 & 시크릿선물</button>
       <button onclick="switchTab('flash')" id="tabBtn_flash" class="flex-1 py-3 text-center border-b-4 border-transparent text-blue-200">📇 단어 암기장</button>
       <button onclick="switchTab('exam')" id="tabBtn_exam" class="flex-1 py-3 text-center border-b-4 border-transparent text-blue-200">⏱️ 실전 단어시험</button>
     </div>
@@ -68,13 +71,18 @@
           <p id="myPointsText" class="text-2xl font-extrabold text-emerald-900 mt-1">0 P</p>
           <p class="text-[11px] text-emerald-600 mt-0.5">50P 달성 시 25,000원!</p>
         </div>
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-3">
+          <p class="text-xs text-amber-800 font-bold">⏱️ 나의 누적 공부시간</p>
+          <p id="myStudyTimeText" class="text-2xl font-extrabold text-amber-900 mt-1">0 분</p>
+          <p class="text-[11px] text-amber-700 mt-0.5">열공왕 시크릿 선물 찬스!</p>
+        </div>
         <div class="bg-blue-50 border border-blue-200 rounded-xl p-3">
           <p class="text-xs text-blue-700 font-bold">📅 나의 성실도</p>
           <p id="myAttText" class="text-xs font-bold text-blue-950 mt-1.5 leading-relaxed">출석 0 / 보충 0<br>지각 0 / 결석 0</p>
         </div>
-        <div class="bg-rose-50 border border-rose-200 rounded-xl p-3 col-span-2">
-          <p class="text-xs text-rose-700 font-bold">🚨 단어 재시 및 과제 알림</p>
-          <div id="myAlertsText" class="text-xs text-rose-900 mt-1 space-y-1 font-medium">대기 중인 재시나 미제출 과제가 없습니다.</div>
+        <div class="bg-rose-50 border border-rose-200 rounded-xl p-3">
+          <p class="text-xs text-rose-700 font-bold">🚨 재시 및 과제 알림</p>
+          <div id="myAlertsText" class="text-xs text-rose-900 mt-1 space-y-1 font-medium">대기 중인 항목 없음</div>
         </div>
       </div>
 
@@ -90,39 +98,91 @@
 
     <div id="noNameWarning" class="hidden bg-amber-50 border-2 border-amber-300 rounded-xl p-6 text-center my-6 shadow-sm">
       <p class="text-base md:text-lg font-extrabold text-amber-900">👆 화면 오른쪽 위에서 '내 이름'을 먼저 선택해 주세요!</p>
-      <p class="text-xs text-amber-700 mt-1.5">내 핸드폰에서 한 번 선택해 두면 다음부터는 내 이름으로 자동 유지됩니다.</p>
+      <p class="text-xs text-amber-700 mt-1.5">내 이름을 선택하고 공부해야 나의 단어 공부 시간(분)이 자동으로 기록됩니다.</p>
     </div>
 
+    <!-- 탭 0: 랭킹 & 시크릿 선물 -->
     <section id="tabContent_rank" class="hidden space-y-4">
-      <div class="bg-blue-50 border border-blue-200 rounded-xl p-3.5 text-xs md:text-sm text-blue-900">
-        💡 <b>50포인트를 달성하면 25,000원의 장학금이 지급됩니다!</b><br>
-        <span class="text-xs text-blue-700">* 본시험 통과(+1P, 일반 1회 / 사전등원 요일 2회), 재시 24h내 통과(+0.5P), 과제 제출(+1P), 클리닉 통과(+1P)</span>
+      <!-- 시크릿 선물 당첨자 명예의 전당 -->
+      <div id="secretGiftHonorBox" class="hidden bg-gradient-to-r from-amber-100 via-yellow-50 to-amber-100 border-2 border-amber-400 rounded-xl p-4 shadow-sm">
+        <p class="text-sm md:text-base font-black text-amber-950 text-center">🎁 열공 단어왕 시크릿 선물 당첨자 발표! 🎁</p>
+        <p class="text-xs text-amber-800 text-center mt-0.5 mb-2.5">자주 접속해 열심히 단어를 공부한 학생에게 선생님이 수여한 깜짝 선물 내역입니다!</p>
+        <div id="secretGiftList" class="space-y-1.5 text-xs md:text-sm font-bold text-slate-800"></div>
       </div>
 
-      <div id="honorBox" class="hidden bg-amber-50 border-2 border-amber-300 rounded-xl p-4 text-center">
-        <p class="text-sm font-extrabold text-amber-900">🎊 명예의 전당 (50P 장학금 수령자) 🎊</p>
-        <p id="honorNames" class="text-sm font-bold text-amber-800 mt-1"></p>
+      <!-- 장학금 50P 명예의 전당 -->
+      <div id="honorBox" class="hidden bg-emerald-50 border-2 border-emerald-300 rounded-xl p-3.5 text-center">
+        <p class="text-xs md:text-sm font-extrabold text-emerald-900">🎊 50P 달성 장학금(25,000원) 수령 명예의 전당 🎊</p>
+        <p id="honorNames" class="text-xs md:text-sm font-bold text-emerald-800 mt-1"></p>
       </div>
 
-      <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div class="px-4 py-3 bg-slate-100 border-b border-slate-200 font-bold text-sm text-slate-800">🔥 현재 진행 중인 장학금 랭킹</div>
-        <div class="overflow-x-auto max-h-[500px]">
-          <table class="w-full text-sm text-left">
-            <thead class="text-xs text-slate-600 bg-slate-50 sticky top-0 border-b">
-              <tr>
-                <th class="px-4 py-2.5">순위</th>
-                <th class="px-4 py-2.5">학생명</th>
-                <th class="px-4 py-2.5">학교</th>
-                <th class="px-4 py-2.5">학년</th>
-                <th class="px-4 py-2.5 text-right">누적 포인트</th>
-              </tr>
-            </thead>
-            <tbody id="rankingTableBody" class="divide-y divide-slate-100"></tbody>
-          </table>
+      <!-- 랭킹 전환 버튼 -->
+      <div class="grid grid-cols-2 gap-2 bg-slate-200 p-1.5 rounded-xl">
+        <button onclick="switchRankSubTab('time')" id="subTabBtn_time" class="py-2.5 rounded-lg text-xs md:text-sm font-extrabold bg-blue-900 text-white shadow">
+          🔥 열공 단어왕 (공부시간 순위)
+        </button>
+        <button onclick="switchRankSubTab('point')" id="subTabBtn_point" class="py-2.5 rounded-lg text-xs md:text-sm font-extrabold text-slate-700 hover:bg-slate-100">
+          💎 장학금 포인트 랭킹 (50P)
+        </button>
+      </div>
+
+      <!-- 서브탭 1: 열공 단어왕 (순수 공부시간 랭킹) -->
+      <div id="rankSubBox_time" class="space-y-3">
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-3.5 text-xs md:text-sm text-amber-950">
+          🤫 <b>선생님이 불시에 '열공 단어왕' 상위권 학생에게 비밀스러운 선물을 증정합니다!</b><br>
+          <span class="text-xs text-amber-800">* 내 이름을 선택하고 [단어 암기장] 또는 [단어 시험]을 공부하면 1분 단위로 실제 공부 시간이 자동 누적됩니다. (장학금 포인트와는 별개입니다)</span>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div class="px-4 py-3 bg-slate-100 border-b border-slate-200 font-bold text-sm text-slate-800 flex justify-between items-center">
+            <span>⏱️ 실시간 단어 공부시간 랭킹</span>
+            <span class="text-xs text-slate-500 font-normal">단위: 분(Minute)</span>
+          </div>
+          <div class="overflow-x-auto max-h-[500px]">
+            <table class="w-full text-sm text-left">
+              <thead class="text-xs text-slate-600 bg-slate-50 sticky top-0 border-b">
+                <tr>
+                  <th class="px-4 py-2.5">순위</th>
+                  <th class="px-4 py-2.5">학생명</th>
+                  <th class="px-4 py-2.5">학교/학년</th>
+                  <th class="px-4 py-2.5 text-center">학습 일수</th>
+                  <th class="px-4 py-2.5 text-right">총 공부시간</th>
+                </tr>
+              </thead>
+              <tbody id="studyTimeRankingBody" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- 서브탭 2: 장학금 포인트 랭킹 -->
+      <div id="rankSubBox_point" class="hidden space-y-3">
+        <div class="bg-blue-50 border border-blue-200 rounded-xl p-3.5 text-xs md:text-sm text-blue-900">
+          💡 <b>50포인트를 달성하면 25,000원의 장학금이 지급됩니다!</b><br>
+          <span class="text-xs text-blue-700">* 본시험 통과(+1P, 일반 1회 / 사전등원 요일 2회), 재시 24h내 통과(+0.5P), 과제 제출(+1P), 클리닉 통과(+1P)</span>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div class="px-4 py-3 bg-slate-100 border-b border-slate-200 font-bold text-sm text-slate-800">💎 현재 진행 중인 장학금 랭킹</div>
+          <div class="overflow-x-auto max-h-[500px]">
+            <table class="w-full text-sm text-left">
+              <thead class="text-xs text-slate-600 bg-slate-50 sticky top-0 border-b">
+                <tr>
+                  <th class="px-4 py-2.5">순위</th>
+                  <th class="px-4 py-2.5">학생명</th>
+                  <th class="px-4 py-2.5">학교</th>
+                  <th class="px-4 py-2.5">학년</th>
+                  <th class="px-4 py-2.5 text-right">누적 포인트</th>
+                </tr>
+              </thead>
+              <tbody id="rankingTableBody" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
         </div>
       </div>
     </section>
 
+    <!-- 탭 1: 단어 암기장 -->
     <section id="tabContent_flash" class="hidden space-y-4">
       <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
         <div class="flex items-center justify-between mb-3">
@@ -143,13 +203,14 @@
             <input type="number" id="flashEnd" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
           </div>
         </div>
-        <button onclick="renderFlashcards()" class="mt-3 w-full bg-blue-900 hover:bg-blue-800 text-white font-bold py-2.5 rounded-lg text-sm transition">✨ 암기 시작!</button>
+        <button onclick="renderFlashcards()" class="mt-3 w-full bg-blue-900 hover:bg-blue-800 text-white font-bold py-2.5 rounded-lg text-sm transition">✨ 암기 시작! (공부시간 자동 측정)</button>
       </div>
 
-      <p id="flashGuide" class="hidden text-xs text-center text-blue-800 bg-blue-50 py-2 rounded-lg font-medium">💡 카드를 터치하면 뜻과 예문이 뒤집혀 보입니다!</p>
+      <p id="flashGuide" class="hidden text-xs text-center text-blue-800 bg-blue-50 py-2 rounded-lg font-medium">💡 카드를 터치하며 공부하면 1분마다 나의 누적 공부시간이 자동으로 기록됩니다!</p>
       <div id="flashcardsContainer" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5"></div>
     </section>
 
+    <!-- 탭 2: 실전 단어시험 -->
     <section id="tabContent_exam" class="hidden space-y-4">
       <div id="examRetakeQuickBox" class="hidden bg-rose-50 border-2 border-rose-300 rounded-xl p-3.5 space-y-2">
         <p class="text-xs font-extrabold text-rose-800">🚨 아직 통과하지 못한 단어시험(또는 미응시)이 있습니다. 아래 버튼을 누르면 범위가 자동 입력됩니다!</p>
@@ -177,8 +238,12 @@
           <div class="col-span-2 md:col-span-1">
             <label class="block text-xs font-bold text-slate-600 mb-1">문항 수</label>
             <select id="examCount" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-medium">
-              <option value="100" selected>100문항</option>
-              <option value="50">50문항</option>
+              <option value="10">10문항</option>
+              <option value="20">20문항</option>
+              <option value="30">30문항</option>
+              <option value="50" selected>50문항</option>
+              <option value="80">80문항</option>
+              <option value="100">100문항</option>
             </select>
           </div>
         </div>
@@ -188,7 +253,7 @@
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <label class="flex items-center space-x-2 border rounded-lg p-2.5 cursor-pointer bg-slate-50">
               <input type="radio" name="examMode" value="practice" checked class="w-4 h-4 text-blue-900">
-              <span class="text-xs font-bold text-slate-800">🛠️ 연습 모드 <span class="font-normal text-slate-500">(성적 미기록·가볍게 테스트용)</span></span>
+              <span class="text-xs font-bold text-slate-800">🛠️ 연습 모드 <span class="font-normal text-slate-500">(성적 미기록·공부시간만 누적)</span></span>
             </label>
             <label class="flex items-center space-x-2 border-2 border-rose-300 rounded-lg p-2.5 cursor-pointer bg-rose-50/60">
               <input type="radio" name="examMode" value="real" class="w-4 h-4 text-rose-600">
@@ -243,6 +308,20 @@
     let examTimerInterval = null;
     let isSubmittingExam = false;
 
+    // ⏱️ 순수 공부 시간(초) 측정 변수 (3분 이상 무반응 시 자동 일시정지)
+    let activeStudySecondsToday = 0;
+    let unsavedStudySeconds = 0;
+    let lastInteractionTime = Date.now();
+    let isSavingStudyTime = false;
+    const MAX_DAILY_STUDY_MINS = 180; // 하루 최대 180분(3시간)까지 인정
+
+    function markUserInteraction() {
+      lastInteractionTime = Date.now();
+    }
+    ["click", "touchstart", "keydown", "scroll"].forEach(evt => {
+      window.addEventListener(evt, markUserInteraction, { passive: true });
+    });
+
     function openExternalFromKakao() {
       const cleanUrl = window.location.origin + window.location.pathname;
       window.location.href = "kakaotalk://web/openExternal?url=" + encodeURIComponent(cleanUrl);
@@ -265,6 +344,124 @@
     function getKSTWeekdayKr() {
       const days = ["일", "월", "화", "수", "목", "금", "토"];
       return days[getKSTNow().getDay()];
+    }
+
+    // 1초마다 실제 공부 중인지 확인하여 공부 시간 누적 & 60초마다 DB 자동 저장
+    setInterval(async () => {
+      const badge = document.getElementById("liveStudyTimeBadge");
+      if (!currentStudent) {
+        if (badge) badge.classList.add("hidden");
+        return;
+      }
+      if (badge) badge.classList.remove("hidden");
+
+      const isPageVisible = document.visibilityState === "visible";
+      const isStudyingTab = (currentTab === "flash" || currentTab === "exam");
+      const isRecentlyActive = (Date.now() - lastInteractionTime) < 180000; // 3분 이내 터치/클릭 활동
+
+      if (isPageVisible && isStudyingTab && isRecentlyActive) {
+        activeStudySecondsToday++;
+        unsavedStudySeconds++;
+      }
+
+      const m = Math.floor(activeStudySecondsToday / 60);
+      const s = String(activeStudySecondsToday % 60).padStart(2, "0");
+      if (badge) {
+        badge.textContent = (isPageVisible && isStudyingTab && isRecentlyActive)
+          ? `⏱️ 공부시간 측정중: 오늘 ${m}분 ${s}초`
+          : `⏸️ 공부시간 일시정지 (암기장·시험 탭에서 작동): 오늘 ${m}분 ${s}초`;
+      }
+
+      if (unsavedStudySeconds >= 60 && !isSavingStudyTime) {
+        const minsToSave = Math.floor(unsavedStudySeconds / 60);
+        unsavedStudySeconds = unsavedStudySeconds % 60;
+        await recordStudyMinutesToServer(currentStudent, minsToSave);
+      }
+    }, 1000);
+
+    async function recordStudyMinutesToServer(stName, addMins) {
+      if (!stName || addMins <= 0) return;
+      isSavingStudyTime = true;
+      try {
+        const todayStr = getKSTDateString();
+        const { data: rows } = await db.from("points").select("*").eq("날짜", todayStr).eq("이름", stName);
+        const studyRow = (rows || []).find(r => String(r.내역 || "").startsWith("[공부시간]"));
+
+        if (studyRow) {
+          const prevMins = parseStudyMinutesFromDesc(studyRow.내역);
+          if (prevMins < MAX_DAILY_STUDY_MINS) {
+            const newMins = Math.min(MAX_DAILY_STUDY_MINS, prevMins + addMins);
+            let q = db.from("points").update({ 내역: `[공부시간] ${newMins}분` });
+            if (studyRow.id !== undefined && studyRow.id !== null) {
+              q = q.eq("id", studyRow.id);
+            } else {
+              q = q.eq("날짜", todayStr).eq("이름", stName).eq("내역", studyRow.내역);
+            }
+            await q;
+          }
+        } else {
+          await safeInsert("points", {
+            날짜: todayStr,
+            이름: stName,
+            내역: `[공부시간] ${addMins}분`,
+            포인트증감: "0"
+          });
+        }
+
+        // 로컬 데이터에도 즉시 반영하여 화면 숫자 갱신
+        const localRow = allPoints.find(p => p.날짜 === todayStr && p.이름 === stName && String(p.내역 || "").startsWith("[공부시간]"));
+        if (localRow) {
+          const pm = parseStudyMinutesFromDesc(localRow.내역);
+          localRow.내역 = `[공부시간] ${Math.min(MAX_DAILY_STUDY_MINS, pm + addMins)}분`;
+        } else {
+          allPoints.push({ 날짜: todayStr, 이름: stName, 내역: `[공부시간] ${addMins}분`, 포인트증감: "0" });
+        }
+        updateMyStudyTimeCard(stName);
+        renderRanking();
+      } catch (e) {
+      } finally {
+        isSavingStudyTime = false;
+      }
+    }
+
+    function parseStudyMinutesFromDesc(desc) {
+      const str = String(desc || "");
+      if (!str.startsWith("[공부시간]")) return 0;
+      const m = str.match(/(\d+)\s*분/);
+      return m ? (parseInt(m[1], 10) || 0) : 0;
+    }
+
+    function updateMyStudyTimeCard(stName) {
+      const myRows = allPoints.filter(p => p.이름 === stName && String(p.내역 || "").startsWith("[공부시간]"));
+      const totalMins = myRows.reduce((acc, r) => acc + parseStudyMinutesFromDesc(r.내역), 0);
+      const el = document.getElementById("myStudyTimeText");
+      if (el) el.textContent = formatMinutesPretty(totalMins);
+    }
+
+    function formatMinutesPretty(mins) {
+      if (mins < 60) return `${mins}분`;
+      const h = Math.floor(mins / 60);
+      const m = mins % 60;
+      return m > 0 ? `${h}시간 ${m}분` : `${h}시간`;
+    }
+
+    function switchRankSubTab(mode) {
+      const btnTime = document.getElementById("subTabBtn_time");
+      const btnPoint = document.getElementById("subTabBtn_point");
+      const boxTime = document.getElementById("rankSubBox_time");
+      const boxPoint = document.getElementById("rankSubBox_point");
+
+      if (mode === "time") {
+        btnTime.className = "py-2.5 rounded-lg text-xs md:text-sm font-extrabold bg-blue-900 text-white shadow";
+        btnPoint.className = "py-2.5 rounded-lg text-xs md:text-sm font-extrabold text-slate-700 hover:bg-slate-100";
+        boxTime.classList.remove("hidden");
+        boxPoint.classList.add("hidden");
+      } else {
+        btnPoint.className = "py-2.5 rounded-lg text-xs md:text-sm font-extrabold bg-blue-900 text-white shadow";
+        btnTime.className = "py-2.5 rounded-lg text-xs md:text-sm font-extrabold text-slate-700 hover:bg-slate-100";
+        boxPoint.classList.remove("hidden");
+        boxTime.classList.add("hidden");
+      }
     }
 
     function getTodayEarlyMinutes(stInfo) {
@@ -427,7 +624,7 @@
       try {
         const [stData, ptData, wbData] = await Promise.all([
           fetchAllRows("students", "*"),
-          fetchAllRows("points", "이름, 포인트증감"),
+          fetchAllRows("points", "날짜, 이름, 내역, 포인트증감"),
           loadWordbookSmart(false)
         ]);
 
@@ -503,6 +700,7 @@
     async function onStudentChange() {
       const selected = document.getElementById("studentSelect").value;
       currentStudent = selected;
+      unsavedStudySeconds = 0;
       if (selected) {
         localStorage.setItem("pqrs_student", selected);
         await loadStudentPersonalData(selected);
@@ -522,15 +720,27 @@
       const earlySummaryText = getEarlyDaysSummaryText(stInfo);
 
       const [ptRes, attRes, vocRes, hwRes, wkRes] = await Promise.all([
-        db.from("points").select("포인트증감").eq("이름", stName),
+        db.from("points").select("날짜, 이름, 내역, 포인트증감").eq("이름", stName),
         db.from("attendance").select("출결, 사전등원달성").eq("이름", stName),
         db.from("vocab_tests").select("날짜, 이름, 점수, 결과, 비고").eq("이름", stName),
         db.from("assignments").select("과제명, 결과, 날짜").eq("이름", stName).eq("결과", "진행중"),
         myGrade ? db.from("weekly_progress").select("*").eq("학년", myGrade) : Promise.resolve({ data: [] })
       ]);
 
-      const myPts = (ptRes.data || []).reduce((acc, cur) => acc + (parseFloat(cur.포인트증감) || 0), 0);
+      const myPtData = ptRes.data || [];
+      const myPts = myPtData.reduce((acc, cur) => acc + (parseFloat(cur.포인트증감) || 0), 0);
       document.getElementById("myPointsText").textContent = `${Number(myPts.toFixed(1))} P`;
+
+      // 나의 오늘 및 누적 공부시간 반영
+      const todayStr = getKSTDateString();
+      const todayStudyRow = myPtData.find(r => r.날짜 === todayStr && String(r.내역 || "").startsWith("[공부시간]"));
+      const todaySavedMins = todayStudyRow ? parseStudyMinutesFromDesc(todayStudyRow.내역) : 0;
+      activeStudySecondsToday = (todaySavedMins * 60) + unsavedStudySeconds;
+
+      const totalStudyMins = myPtData
+        .filter(r => String(r.내역 || "").startsWith("[공부시간]"))
+        .reduce((acc, r) => acc + parseStudyMinutesFromDesc(r.내역), 0);
+      document.getElementById("myStudyTimeText").textContent = formatMinutesPretty(totalStudyMins);
 
       const attData = attRes.data || [];
       const attC = attData.filter(x => x.출결 === "출석").length;
@@ -540,7 +750,7 @@
       const earlyC = attData.filter(x => x.사전등원달성 === "성공").length;
       let attHtml = `출석 ${attC} / 보충 ${mkC}<br>지각 ${lateC} / 결석 ${absC}`;
       if (earlySummaryText || earlyC > 0) {
-        attHtml += `<br><span class="text-indigo-700">일찍오기 성공: ${earlyC}회 ${earlySummaryText ? `[${escapeHtml(earlySummaryText)}]` : ''}</span>`;
+        attHtml += `<br><span class="text-indigo-700">일찍오기: ${earlyC}회</span>`;
       }
       document.getElementById("myAttText").innerHTML = attHtml;
 
@@ -568,17 +778,15 @@
       const hws = hwRes.data || [];
       let alertLines = [];
       if (myRetakes.length > 0) {
-        alertLines.push(`🚨 <b>미통과/미응시 재시: ${myRetakes.length}건</b> 대기 중! (실전 단어시험 탭에서 응시)`);
+        alertLines.push(`🚨 <b>단어 재시: ${myRetakes.length}건</b>`);
       }
       if (hws.length > 0) {
-        const hwNames = hws.map(h => `${escapeHtml(h.과제명)}(~${escapeHtml(h.날짜)})`).join(", ");
-        alertLines.push(`📝 <b>미제출 과제(${hws.length}건):</b> ${hwNames}`);
+        alertLines.push(`📝 <b>미제출 과제: ${hws.length}건</b>`);
       }
-      alertsBox.innerHTML = alertLines.length > 0 ? alertLines.join("<br>") : "<span class='text-emerald-700 font-bold'>🎉 대기 중인 재시나 미제출 과제가 없습니다!</span>";
+      alertsBox.innerHTML = alertLines.length > 0 ? alertLines.join("<br>") : "<span class='text-emerald-700 font-bold'>🎉 모두 완료!</span>";
 
       renderRetakeQuickButtons();
 
-      // 💡 주간 진도표: 여러 행이 있더라도 내용이 존재하는 가장 최신 행을 우선 선택
       const wkBox = document.getElementById("weeklyProgressBox");
       if (wkRes.data && wkRes.data.length > 0) {
         const nonEmptyRows = wkRes.data.filter(r =>
@@ -640,6 +848,7 @@
     function switchTab(tabName) {
       currentTab = tabName;
       localStorage.setItem("pqrs_tab", tabName);
+      markUserInteraction();
 
       ["rank", "flash", "exam"].forEach(t => {
         const btn = document.getElementById(`tabBtn_${t}`);
@@ -662,6 +871,27 @@
     }
 
     function renderRanking() {
+      // 1) 시크릿 선물 당첨자 명예의 전당 렌더링
+      const giftRows = allPoints.filter(p => String(p.내역 || "").startsWith("[시크릿선물]"));
+      const giftBox = document.getElementById("secretGiftHonorBox");
+      const giftListEl = document.getElementById("secretGiftList");
+      if (giftRows.length > 0) {
+        giftBox.classList.remove("hidden");
+        const recentGifts = [...giftRows].reverse().slice(0, 8);
+        giftListEl.innerHTML = recentGifts.map(g => {
+          const giftName = String(g.내역 || "").replace("[시크릿선물]", "").trim();
+          return `
+            <div class="bg-white/90 border border-amber-300 rounded-lg px-3 py-2 flex items-center justify-between">
+              <span>🎉 <b>${escapeHtml(maskName(g.이름))}</b> 학생 <span class="text-slate-400 font-normal">(${escapeHtml(g.날짜 || '')})</span></span>
+              <span class="bg-amber-500 text-white px-2.5 py-0.5 rounded-full text-xs font-extrabold">🎁 ${escapeHtml(giftName)}</span>
+            </div>
+          `;
+        }).join("");
+      } else {
+        giftBox.classList.add("hidden");
+      }
+
+      // 2) 50P 장학금 수령 명예의 전당
       const payouts = allPoints.filter(p => (parseFloat(p.포인트증감) || 0) <= -50);
       if (payouts.length > 0) {
         const honorNames = [...new Set(payouts.map(p => maskName(p.이름)))];
@@ -669,14 +899,54 @@
         document.getElementById("honorBox").classList.remove("hidden");
       }
 
+      const validStudents = allStudents.filter(s => s.상태 === "재원" || s.상태 === "휴원");
+
+      // 3) 열공 단어왕 (순수 공부시간 분) 집계
+      const timeMap = {};
+      const daysMap = {};
+      allPoints.forEach(p => {
+        const desc = String(p.내역 || "");
+        if (desc.startsWith("[공부시간]")) {
+          const mins = parseStudyMinutesFromDesc(desc);
+          if (mins > 0) {
+            timeMap[p.이름] = (timeMap[p.이름] || 0) + mins;
+            if (!daysMap[p.이름]) daysMap[p.이름] = new Set();
+            if (p.날짜) daysMap[p.이름].add(p.날짜);
+          }
+        }
+      });
+
+      const rankedTime = validStudents.map(s => ({
+        학생명: maskName(s.이름),
+        학교학년: `${s.학교 || ""} ${String(s.학년 || "").replace(/고|학년/g, "").trim()}학년`,
+        학습일수: daysMap[s.이름] ? daysMap[s.이름].size : 0,
+        공부시간분: timeMap[s.이름] || 0
+      })).sort((a, b) => (b.공부시간분 - a.공부시간분) || (b.학습일수 - a.학습일수));
+
+      const timeTbody = document.getElementById("studyTimeRankingBody");
+      timeTbody.innerHTML = "";
+      rankedTime.forEach((r, idx) => {
+        const tr = document.createElement("tr");
+        tr.className = idx < 3 ? "bg-amber-50/70 font-semibold" : "";
+        const medal = idx === 0 ? "🥇 1위" : idx === 1 ? "🥈 2위" : idx === 2 ? "🥉 3위" : `${idx + 1}위`;
+        tr.innerHTML = `
+          <td class="px-4 py-2.5 text-slate-700">${medal}</td>
+          <td class="px-4 py-2.5 text-slate-900 font-bold">${escapeHtml(r.학생명)}</td>
+          <td class="px-4 py-2.5 text-slate-600 text-xs">${escapeHtml(r.학교학년)}</td>
+          <td class="px-4 py-2.5 text-center text-slate-700">${r.학습일수}일</td>
+          <td class="px-4 py-2.5 text-right font-extrabold text-amber-800">${formatMinutesPretty(r.공부시간분)} <span class="text-xs font-normal text-slate-500">(${r.공부시간분}분)</span></td>
+        `;
+        timeTbody.appendChild(tr);
+      });
+
+      // 4) 장학금 포인트 랭킹 집계
       const ptMap = {};
       allPoints.forEach(p => {
         const val = parseFloat(p.포인트증감) || 0;
         ptMap[p.이름] = (ptMap[p.이름] || 0) + val;
       });
 
-      const validStudents = allStudents.filter(s => s.상태 === "재원" || s.상태 === "휴원");
-      const ranked = validStudents.map(s => ({
+      const rankedPt = validStudents.map(s => ({
         학생명: maskName(s.이름),
         학교: s.학교 || "",
         학년: String(s.학년 || "").replace(/고|학년/g, "").trim() + "학년",
@@ -685,7 +955,7 @@
 
       const tbody = document.getElementById("rankingTableBody");
       tbody.innerHTML = "";
-      ranked.forEach((r, idx) => {
+      rankedPt.forEach((r, idx) => {
         const tr = document.createElement("tr");
         tr.className = idx < 3 ? "bg-yellow-50/50 font-semibold" : "";
         const medal = idx === 0 ? "🥇 1위" : idx === 1 ? "🥈 2위" : idx === 2 ? "🥉 3위" : `${idx + 1}위`;
@@ -701,6 +971,7 @@
     }
 
     function renderFlashcards() {
+      markUserInteraction();
       const cat = document.getElementById("flashCat").value;
       const sNum = parseInt(document.getElementById("flashStart").value, 10) || 0;
       const eNum = parseInt(document.getElementById("flashEnd").value, 10) || 0;
@@ -718,7 +989,10 @@
       list.forEach(w => {
         const card = document.createElement("div");
         card.className = "flip-card";
-        card.onclick = () => card.classList.toggle("flipped");
+        card.onclick = () => {
+          markUserInteraction();
+          card.classList.toggle("flipped");
+        };
         card.innerHTML = `
           <div class="flip-card-inner">
             <div class="flip-card-front">
@@ -751,6 +1025,7 @@
         alert("화면 오른쪽 위에서 '내 이름'을 먼저 선택해 주세요!");
         return;
       }
+      markUserInteraction();
       const cat = document.getElementById("examCat").value;
       const sNum = parseInt(document.getElementById("examStart").value, 10) || 0;
       const eNum = parseInt(document.getElementById("examEnd").value, 10) || 0;
@@ -895,6 +1170,7 @@
     }
 
     function selectAnswerOption(qIndex, optIndex) {
+      markUserInteraction();
       const saved = localStorage.getItem("pqrs_active_exam_v2");
       if (!saved) return;
       const examState = JSON.parse(saved);
@@ -996,6 +1272,12 @@
         const mins = Math.floor(elapsedSecs / 60);
         const secs = elapsedSecs % 60;
 
+        // 시험을 제출할 때 남은 초 단위 공부시간이 있으면 حداقل 1분으로 반올림하여 공부시간에 반영
+        if (unsavedStudySeconds >= 20) {
+          unsavedStudySeconds = 0;
+          await recordStudyMinutesToServer(examStudent, 1);
+        }
+
         let status = "";
         if (elapsedSecs > 900) status = "미통과 (15분 시간초과)";
         else if (finalScore < passCutoff) status = `미통과 (기준 ${passCutoff}점)`;
@@ -1087,7 +1369,6 @@
             }
           }
 
-          // 💡 [핵심 수정] 오직 [본시험](!isRetake)을 제출했을 때만 자동 출결 기록 ([재시험]은 출결 처리 안 함)
           if (!isRetake) {
             const { data: attToday } = await db.from("attendance").select("*").eq("이름", examStudent).eq("날짜", todayStr);
             if (!attToday || attToday.length === 0) {
@@ -1166,7 +1447,7 @@
       resBox.innerHTML = `
         <div class="text-center space-y-1">
           <span class="inline-block px-3 py-1 rounded-full text-xs font-extrabold ${isPass ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">
-            ${examState.isPractice ? '🛠️ 연습 모드 채점 완료' : '🔥 실전 모드 성적 전송 완료!'}
+            ${examState.isPractice ? '🛠️ 연습 모드 채점 완료 (공부시간 자동 반영)' : '🔥 실전 모드 성적 전송 완료!'}
           </span>
           <h3 class="text-3xl font-black ${isPass ? 'text-blue-900' : 'text-rose-600'} pt-1">${finalScore}점 <span class="text-lg">(${escapeHtml(status)})</span></h3>
           <p class="text-xs text-slate-500">응시자: <b>${escapeHtml(examState.student)}</b> | 소요 시간: ${mins}분 ${secs}초</p>
