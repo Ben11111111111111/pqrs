@@ -234,7 +234,7 @@
     const SAME_RANGE_COOLDOWN_DAYS = 7;
     const WORDBOOK_CACHE_KEY = "pqrs_wb_cache_v1";
     const WORDBOOK_CACHE_TIME_KEY = "pqrs_wb_cache_time_v1";
-    const WORDBOOK_CACHE_TTL_MS = 30 * 60 * 1000; // 30분 캐싱
+    const WORDBOOK_CACHE_TTL_MS = 30 * 60 * 1000;
 
     let allStudents = [];
     let allWordbook = [];
@@ -582,13 +582,19 @@
 
       renderRetakeQuickButtons();
 
+      // 💡 주간 진도표: 여러 행이 있더라도 내용이 존재하는 가장 최신 행을 우선 선택
       const wkBox = document.getElementById("weeklyProgressBox");
       if (wkRes.data && wkRes.data.length > 0) {
-        const w = wkRes.data[0];
+        const nonEmptyRows = wkRes.data.filter(r =>
+          String(r["1회차수업"] || "").trim() ||
+          String(r["2회차수업"] || "").trim() ||
+          String(r["클리닉"] || "").trim()
+        );
+        const w = nonEmptyRows.length > 0 ? nonEmptyRows[nonEmptyRows.length - 1] : wkRes.data[wkRes.data.length - 1];
         document.getElementById("weeklyTitle").textContent = `📢 나의 이번 주 학습 진도 및 단어 범위 (${myGrade}) - 업데이트: ${w.업데이트일자 || ''}`;
-        document.getElementById("weekly1").textContent = w["1회차수업"] || "-";
-        document.getElementById("weekly2").textContent = w["2회차수업"] || "-";
-        document.getElementById("weeklyClinic").textContent = w["클리닉"] || "-";
+        document.getElementById("weekly1").textContent = String(w["1회차수업"] || "").trim() || "-";
+        document.getElementById("weekly2").textContent = String(w["2회차수업"] || "").trim() || "-";
+        document.getElementById("weeklyClinic").textContent = String(w["클리닉"] || "").trim() || "-";
         wkBox.classList.remove("hidden");
       } else {
         wkBox.classList.add("hidden");
@@ -1085,18 +1091,21 @@
             }
           }
 
-          const { data: attToday } = await db.from("attendance").select("*").eq("이름", examStudent).eq("날짜", todayStr);
-          if (!attToday || attToday.length === 0) {
-            const isMakeupToday = String(stInfo.보충일정 || "").includes(todayStr);
-            if (earlyReqToday === 0) {
-              await safeInsert("attendance", {
-                날짜: todayStr,
-                이름: examStudent,
-                출결: isMakeupToday ? "보충" : "출석",
-                등원시간: "-",
-                사전등원달성: "해당없음",
-                비고: "시험제출 자동출결"
-              });
+          // 💡 [핵심 수정] 오직 [본시험](!isRetake)을 제출했을 때만 자동 출결 기록 ([재시험]은 출결 처리 안 함)
+          if (!isRetake) {
+            const { data: attToday } = await db.from("attendance").select("*").eq("이름", examStudent).eq("날짜", todayStr);
+            if (!attToday || attToday.length === 0) {
+              const isMakeupToday = String(stInfo.보충일정 || "").includes(todayStr);
+              if (earlyReqToday === 0) {
+                await safeInsert("attendance", {
+                  날짜: todayStr,
+                  이름: examStudent,
+                  출결: isMakeupToday ? "보충" : "출석",
+                  등원시간: "-",
+                  사전등원달성: "해당없음",
+                  비고: "본시험제출 자동출결"
+                });
+              }
             }
           }
         }
