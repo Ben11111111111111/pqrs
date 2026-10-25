@@ -7,7 +7,9 @@
   <script>
     (function() {
       const cleanUrl = window.location.origin + window.location.pathname;
-      if (window.location.search) window.history.replaceState({}, document.title, cleanUrl);
+      if (window.location.search) {
+        window.history.replaceState({}, document.title, cleanUrl);
+      }
       const ua = navigator.userAgent.toLowerCase();
       if (ua.includes("kakaotalk")) {
         window.location.href = "kakaotalk://web/openExternal?url=" + encodeURIComponent(cleanUrl);
@@ -19,7 +21,7 @@
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   <style>
     body { font-family: 'Pretendard', 'Malgun Gothic', sans-serif; background-color: #f8fafc; -webkit-tap-highlight-color: transparent; }
-    .flip-card { background-color: transparent; width: 100%; height: 180px; perspective: 1000px; }
+    .flip-card { background-color: transparent; width: 100%; height: 170px; perspective: 1000px; }
     .flip-card-inner { position: relative; width: 100%; height: 100%; text-align: center; transition: transform 0.5s; transform-style: preserve-3d; cursor: pointer; }
     .flip-card.flipped .flip-card-inner { transform: rotateY(180deg); }
     .flip-card-front, .flip-card-back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 14px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); padding: 12px; }
@@ -49,11 +51,10 @@
         </select>
       </div>
     </div>
-    <div class="max-w-4xl mx-auto px-1 flex border-t border-blue-800 bg-blue-950 text-[11px] md:text-sm font-semibold">
-      <button onclick="switchTab('rank')" id="tabBtn_rank" class="flex-1 py-3 text-center border-b-4 border-yellow-400 text-yellow-300">🏆 랭킹/선물</button>
-      <button onclick="switchTab('flash')" id="tabBtn_flash" class="flex-1 py-3 text-center border-b-4 border-transparent text-blue-200">📇 단어암기장</button>
-      <button onclick="switchTab('exam')" id="tabBtn_exam" class="flex-1 py-3 text-center border-b-4 border-transparent text-blue-200">⏱️ 실전단어시험</button>
-      <button onclick="switchTab('core')" id="tabBtn_core" class="flex-1 py-3 text-center border-b-4 border-transparent text-blue-200">📝 주간과제퀴즈<span id="corePendingBadge" class="hidden ml-1 bg-rose-600 text-white text-[10px] px-1.5 py-0.5 rounded-full">0</span></button>
+    <div class="max-w-4xl mx-auto px-2 flex border-t border-blue-800 bg-blue-950 text-xs md:text-sm font-semibold">
+      <button onclick="switchTab('rank')" id="tabBtn_rank" class="flex-1 py-3 text-center border-b-4 border-yellow-400 text-yellow-300">🏆 랭킹 & 시크릿선물</button>
+      <button onclick="switchTab('flash')" id="tabBtn_flash" class="flex-1 py-3 text-center border-b-4 border-transparent text-blue-200">📇 단어 암기장</button>
+      <button onclick="switchTab('exam')" id="tabBtn_exam" class="flex-1 py-3 text-center border-b-4 border-transparent text-blue-200">⏱️ 실전 단어시험</button>
     </div>
   </header>
 
@@ -84,49 +85,96 @@
           <div id="myAlertsText" class="text-xs text-rose-900 mt-1 space-y-1 font-medium">대기 중인 항목 없음</div>
         </div>
       </div>
+
+      <div id="weeklyProgressBox" class="hidden bg-indigo-50 border border-indigo-200 rounded-xl p-3.5">
+        <p id="weeklyTitle" class="text-xs font-bold text-indigo-900 mb-2">📢 나의 이번 주 학습 진도 및 단어 범위</p>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
+          <div class="bg-white p-2.5 rounded-lg border border-indigo-100"><span class="font-bold text-indigo-800 block mb-1">📚 1회차 수업</span><span id="weekly1" class="whitespace-pre-line text-slate-700"></span></div>
+          <div class="bg-white p-2.5 rounded-lg border border-indigo-100"><span class="font-bold text-indigo-800 block mb-1">📚 2회차 수업</span><span id="weekly2" class="whitespace-pre-line text-slate-700"></span></div>
+          <div class="bg-white p-2.5 rounded-lg border border-indigo-100"><span class="font-bold text-indigo-800 block mb-1">🏥 클리닉</span><span id="weeklyClinic" class="whitespace-pre-line text-slate-700"></span></div>
+        </div>
+      </div>
     </section>
 
     <div id="noNameWarning" class="hidden bg-amber-50 border-2 border-amber-300 rounded-xl p-6 text-center my-6 shadow-sm">
       <p class="text-base md:text-lg font-extrabold text-amber-900">👆 화면 오른쪽 위에서 '내 이름'을 먼저 선택해 주세요!</p>
-      <p class="text-xs text-amber-700 mt-1.5">내 이름을 선택해야 나만의 단어장과 공부시간, 주간과제 퀴즈가 정상 연동됩니다.</p>
+      <p class="text-xs text-amber-700 mt-1.5">내 이름을 선택하고 공부해야 나의 단어 공부 시간(분)이 자동으로 기록됩니다.</p>
     </div>
 
     <!-- 탭 0: 랭킹 & 시크릿 선물 -->
     <section id="tabContent_rank" class="hidden space-y-4">
+      <!-- 시크릿 선물 당첨자 명예의 전당 -->
       <div id="secretGiftHonorBox" class="hidden bg-gradient-to-r from-amber-100 via-yellow-50 to-amber-100 border-2 border-amber-400 rounded-xl p-4 shadow-sm">
         <p class="text-sm md:text-base font-black text-amber-950 text-center">🎁 열공 단어왕 시크릿 선물 당첨자 발표! 🎁</p>
-        <div id="secretGiftList" class="space-y-1.5 text-xs md:text-sm font-bold text-slate-800 mt-2"></div>
+        <p class="text-xs text-amber-800 text-center mt-0.5 mb-2.5">자주 접속해 열심히 단어를 공부한 학생에게 선생님이 수여한 깜짝 선물 내역입니다!</p>
+        <div id="secretGiftList" class="space-y-1.5 text-xs md:text-sm font-bold text-slate-800"></div>
       </div>
+
+      <!-- 장학금 50P 명예의 전당 -->
       <div id="honorBox" class="hidden bg-emerald-50 border-2 border-emerald-300 rounded-xl p-3.5 text-center">
         <p class="text-xs md:text-sm font-extrabold text-emerald-900">🎊 50P 달성 장학금(25,000원) 수령 명예의 전당 🎊</p>
         <p id="honorNames" class="text-xs md:text-sm font-bold text-emerald-800 mt-1"></p>
       </div>
+
+      <!-- 랭킹 전환 버튼 -->
       <div class="grid grid-cols-2 gap-2 bg-slate-200 p-1.5 rounded-xl">
-        <button onclick="switchRankSubTab('time')" id="subTabBtn_time" class="py-2.5 rounded-lg text-xs md:text-sm font-extrabold bg-blue-900 text-white shadow">🔥 열공 단어왕 (공부시간 순위)</button>
-        <button onclick="switchRankSubTab('point')" id="subTabBtn_point" class="py-2.5 rounded-lg text-xs md:text-sm font-extrabold text-slate-700 hover:bg-slate-100">💎 장학금 포인트 랭킹</button>
+        <button onclick="switchRankSubTab('time')" id="subTabBtn_time" class="py-2.5 rounded-lg text-xs md:text-sm font-extrabold bg-blue-900 text-white shadow">
+          🔥 열공 단어왕 (공부시간 순위)
+        </button>
+        <button onclick="switchRankSubTab('point')" id="subTabBtn_point" class="py-2.5 rounded-lg text-xs md:text-sm font-extrabold text-slate-700 hover:bg-slate-100">
+          💎 장학금 포인트 랭킹 (50P)
+        </button>
       </div>
+
+      <!-- 서브탭 1: 열공 단어왕 (순수 공부시간 랭킹) -->
       <div id="rankSubBox_time" class="space-y-3">
         <div class="bg-amber-50 border border-amber-200 rounded-xl p-3.5 text-xs md:text-sm text-amber-950">
-          🤫 <b>선생님이 불시에 '열공 단어왕' 상위권 학생에게 비밀스러운 선물을 증정합니다!</b>
+          🤫 <b>선생님이 불시에 '열공 단어왕' 상위권 학생에게 비밀스러운 선물을 증정합니다!</b><br>
+          <span class="text-xs text-amber-800">* 내 이름을 선택하고 [단어 암기장] 또는 [단어 시험]을 공부하면 1분 단위로 실제 공부 시간이 자동 누적됩니다. (장학금 포인트와는 별개입니다)</span>
         </div>
+
         <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           <div class="px-4 py-3 bg-slate-100 border-b border-slate-200 font-bold text-sm text-slate-800 flex justify-between items-center">
-            <span>⏱️ 실시간 공부시간 랭킹</span><span class="text-xs text-slate-500 font-normal">단위: 분</span>
+            <span>⏱️ 실시간 단어 공부시간 랭킹</span>
+            <span class="text-xs text-slate-500 font-normal">단위: 분(Minute)</span>
           </div>
           <div class="overflow-x-auto max-h-[500px]">
             <table class="w-full text-sm text-left">
-              <thead class="text-xs text-slate-600 bg-slate-50 sticky top-0 border-b"><tr><th class="px-4 py-2.5">순위</th><th class="px-4 py-2.5">학생명</th><th class="px-4 py-2.5">학교/학년</th><th class="px-4 py-2.5 text-center">학습 일수</th><th class="px-4 py-2.5 text-right">총 공부시간</th></tr></thead>
+              <thead class="text-xs text-slate-600 bg-slate-50 sticky top-0 border-b">
+                <tr>
+                  <th class="px-4 py-2.5">순위</th>
+                  <th class="px-4 py-2.5">학생명</th>
+                  <th class="px-4 py-2.5">학교/학년</th>
+                  <th class="px-4 py-2.5 text-center">학습 일수</th>
+                  <th class="px-4 py-2.5 text-right">총 공부시간</th>
+                </tr>
+              </thead>
               <tbody id="studyTimeRankingBody" class="divide-y divide-slate-100"></tbody>
             </table>
           </div>
         </div>
       </div>
+
+      <!-- 서브탭 2: 장학금 포인트 랭킹 -->
       <div id="rankSubBox_point" class="hidden space-y-3">
+        <div class="bg-blue-50 border border-blue-200 rounded-xl p-3.5 text-xs md:text-sm text-blue-900">
+          💡 <b>50포인트를 달성하면 25,000원의 장학금이 지급됩니다!</b><br>
+          <span class="text-xs text-blue-700">* 본시험 통과(+1P, 일반 1회 / 사전등원 요일 2회), 재시 24h내 통과(+0.5P), 과제 제출(+1P), 클리닉 통과(+1P)</span>
+        </div>
+
         <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div class="px-4 py-3 bg-slate-100 border-b border-slate-200 font-bold text-sm text-slate-800">💎 장학금 포인트 랭킹</div>
+          <div class="px-4 py-3 bg-slate-100 border-b border-slate-200 font-bold text-sm text-slate-800">💎 현재 진행 중인 장학금 랭킹</div>
           <div class="overflow-x-auto max-h-[500px]">
             <table class="w-full text-sm text-left">
-              <thead class="text-xs text-slate-600 bg-slate-50 sticky top-0 border-b"><tr><th class="px-4 py-2.5">순위</th><th class="px-4 py-2.5">학생명</th><th class="px-4 py-2.5">학교</th><th class="px-4 py-2.5">학년</th><th class="px-4 py-2.5 text-right">누적 포인트</th></tr></thead>
+              <thead class="text-xs text-slate-600 bg-slate-50 sticky top-0 border-b">
+                <tr>
+                  <th class="px-4 py-2.5">순위</th>
+                  <th class="px-4 py-2.5">학생명</th>
+                  <th class="px-4 py-2.5">학교</th>
+                  <th class="px-4 py-2.5">학년</th>
+                  <th class="px-4 py-2.5 text-right">누적 포인트</th>
+                </tr>
+              </thead>
               <tbody id="rankingTableBody" class="divide-y divide-slate-100"></tbody>
             </table>
           </div>
@@ -134,115 +182,108 @@
       </div>
     </section>
 
-    <!-- 탭 1: 단어 암기장 (나만의 모르는 단어장 + TTS 음성 + 오답 자동 추가) -->
+    <!-- 탭 1: 단어 암기장 -->
     <section id="tabContent_flash" class="hidden space-y-4">
-      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 space-y-3">
-        <div class="flex items-center justify-between">
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+        <div class="flex items-center justify-between mb-3">
           <h2 class="text-base font-bold text-slate-800">📇 스마트 단어 암기장</h2>
-          <div class="flex items-center space-x-2">
-            <button onclick="toggleMyVocaMode()" id="myVocaToggleBtn" class="text-xs bg-amber-500 hover:bg-amber-600 text-white font-black px-3 py-1.5 rounded-lg shadow transition">⭐ 나만의 모르는 단어장 (0개)</button>
-            <button onclick="forceRefreshWordbook()" class="text-[11px] bg-slate-100 text-slate-600 font-bold px-2.5 py-1.5 rounded border">🔄 새로고침</button>
+          <button onclick="forceRefreshWordbook()" class="text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold px-2.5 py-1 rounded border border-slate-300">🔄 단어장 새로고침</button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-600 mb-1">학습할 단어장</label>
+            <select id="flashCat" onchange="onFlashCatChange()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-medium"></select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-600 mb-1">시작 번호</label>
+            <input type="number" id="flashStart" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-600 mb-1">끝 번호</label>
+            <input type="number" id="flashEnd" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
           </div>
         </div>
-
-        <div id="normalFlashControls" class="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div><label class="block text-xs font-bold text-slate-600 mb-1">학습할 단어장</label><select id="flashCat" onchange="onFlashCatChange()" class="w-full border rounded-lg px-3 py-2 text-sm font-medium"></select></div>
-          <div><label class="block text-xs font-bold text-slate-600 mb-1">시작 번호</label><input type="number" id="flashStart" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
-          <div><label class="block text-xs font-bold text-slate-600 mb-1">끝 번호</label><input type="number" id="flashEnd" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
-        </div>
-
-        <div id="myVocaControls" class="hidden bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center justify-between">
-          <span class="text-xs font-extrabold text-amber-900">⭐ 내가 모르는 단어로 찜한 단어들만 모아서 암기합니다!</span>
-          <button onclick="startMyVocaMiniTest()" class="bg-blue-900 hover:bg-blue-800 text-white text-xs font-bold px-3.5 py-2 rounded-lg shadow">🎯 내 오답 단어만 미니 테스트 (맞히면 자동 졸업!)</button>
-        </div>
-
-        <button onclick="renderFlashcards()" class="w-full bg-blue-900 hover:bg-blue-800 text-white font-bold py-2.5 rounded-lg text-sm transition">✨ 암기 시작! (공부시간 측정)</button>
+        <button onclick="renderFlashcards()" class="mt-3 w-full bg-blue-900 hover:bg-blue-800 text-white font-bold py-2.5 rounded-lg text-sm transition">✨ 암기 시작! (공부시간 자동 측정)</button>
       </div>
 
-      <p id="flashGuide" class="hidden text-xs text-center text-blue-800 bg-blue-50 py-2 rounded-lg font-medium">💡 카드를 터치해 뒤집고, 🔊 버튼으로 원어민 발음을 들으며, ☆ 버튼을 눌러 내 단어장에 담으세요!</p>
+      <p id="flashGuide" class="hidden text-xs text-center text-blue-800 bg-blue-50 py-2 rounded-lg font-medium">💡 카드를 터치하며 공부하면 1분마다 나의 누적 공부시간이 자동으로 기록됩니다!</p>
       <div id="flashcardsContainer" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5"></div>
-
-      <!-- 내 오답 미니 테스트 모달 영역 -->
-      <div id="myVocaTestModal" class="hidden bg-white p-5 rounded-2xl shadow-xl border-2 border-amber-500 space-y-4">
-        <div class="flex items-center justify-between border-b pb-2">
-          <h3 class="text-base font-black text-amber-950">🎯 나만의 모르는 단어 미니 테스트 (맞히면 자동 졸업!)</h3>
-          <button onclick="closeMyVocaTest()" class="text-xs bg-slate-200 px-2.5 py-1 rounded font-bold">닫기</button>
-        </div>
-        <div id="myVocaTestBody" class="space-y-4"></div>
-      </div>
     </section>
 
     <!-- 탭 2: 실전 단어시험 -->
     <section id="tabContent_exam" class="hidden space-y-4">
       <div id="examRetakeQuickBox" class="hidden bg-rose-50 border-2 border-rose-300 rounded-xl p-3.5 space-y-2">
-        <p class="text-xs font-extrabold text-rose-800">🚨 아직 통과하지 못한 단어시험이 있습니다. 버튼을 누르면 범위가 자동 입력됩니다!</p>
+        <p class="text-xs font-extrabold text-rose-800">🚨 아직 통과하지 못한 단어시험(또는 미응시)이 있습니다. 아래 버튼을 누르면 범위가 자동 입력됩니다!</p>
         <div id="examRetakeButtons" class="space-y-1.5"></div>
       </div>
+
       <div id="examSetupBox" class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
         <div class="flex items-center justify-between mb-3">
           <h2 class="text-base font-bold text-slate-800">⏱️ 온라인 단어 시험 설정</h2>
-          <button onclick="forceRefreshWordbook()" class="text-[11px] bg-slate-100 text-slate-600 font-bold px-2.5 py-1 rounded border">🔄 새로고침</button>
+          <button onclick="forceRefreshWordbook()" class="text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold px-2.5 py-1 rounded border border-slate-300">🔄 단어장 새로고침</button>
         </div>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div class="col-span-2 md:col-span-1"><label class="block text-xs font-bold text-slate-600 mb-1">단어장 선택</label><select id="examCat" onchange="onExamCatChange()" class="w-full border rounded-lg px-3 py-2 text-sm font-medium"></select></div>
-          <div><label class="block text-xs font-bold text-slate-600 mb-1">시작 번호</label><input type="number" id="examStart" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
-          <div><label class="block text-xs font-bold text-slate-600 mb-1">끝 번호</label><input type="number" id="examEnd" class="w-full border rounded-lg px-3 py-2 text-sm"></div>
+          <div class="col-span-2 md:col-span-1">
+            <label class="block text-xs font-bold text-slate-600 mb-1">단어장 선택</label>
+            <select id="examCat" onchange="onExamCatChange()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-medium"></select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-600 mb-1">시작 번호</label>
+            <input type="number" id="examStart" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-600 mb-1">끝 번호</label>
+            <input type="number" id="examEnd" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+          </div>
           <div class="col-span-2 md:col-span-1">
             <label class="block text-xs font-bold text-slate-600 mb-1">문항 수</label>
-            <select id="examCount" class="w-full border rounded-lg px-3 py-2 text-sm font-medium">
-              <option value="10">10문항</option><option value="20">20문항</option><option value="30">30문항</option><option value="50" selected>50문항</option><option value="80">80문항</option><option value="100">100문항</option>
+            <select id="examCount" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-medium">
+              <option value="10">10문항</option>
+              <option value="20">20문항</option>
+              <option value="30">30문항</option>
+              <option value="50" selected>50문항</option>
+              <option value="80">80문항</option>
+              <option value="100">100문항</option>
             </select>
           </div>
         </div>
-        <div class="mt-3 pt-3 border-t">
-          <label class="block text-xs font-bold text-slate-600 mb-2">시험 모드 선택 (틀린 단어는 자동 오답노트 납치!)</label>
+
+        <div class="mt-3 pt-3 border-t border-slate-100">
+          <label class="block text-xs font-bold text-slate-600 mb-2">시험 모드 선택 (필수)</label>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <label class="flex items-center space-x-2 border rounded-lg p-2.5 cursor-pointer bg-slate-50"><input type="radio" name="examMode" value="practice" checked class="w-4 h-4 text-blue-900"><span class="text-xs font-bold text-slate-800">🛠️ 연습 모드 <span class="font-normal text-slate-500">(성적 미기록·공부시간 누적)</span></span></label>
-            <label class="flex items-center space-x-2 border-2 border-rose-300 rounded-lg p-2.5 cursor-pointer bg-rose-50/60"><input type="radio" name="examMode" value="real" class="w-4 h-4 text-rose-600"><span class="text-xs font-bold text-rose-900">🔥 실전 모드 <span class="font-normal text-rose-700">(성적 전송·포인트 획득)</span></span></label>
+            <label class="flex items-center space-x-2 border rounded-lg p-2.5 cursor-pointer bg-slate-50">
+              <input type="radio" name="examMode" value="practice" checked class="w-4 h-4 text-blue-900">
+              <span class="text-xs font-bold text-slate-800">🛠️ 연습 모드 <span class="font-normal text-slate-500">(성적 미기록·공부시간만 누적)</span></span>
+            </label>
+            <label class="flex items-center space-x-2 border-2 border-rose-300 rounded-lg p-2.5 cursor-pointer bg-rose-50/60">
+              <input type="radio" name="examMode" value="real" class="w-4 h-4 text-rose-600">
+              <span class="text-xs font-bold text-rose-900">🔥 실전 모드 <span class="font-normal text-rose-700">(성적 전송·포인트 획득)</span></span>
+            </label>
           </div>
         </div>
+
         <button onclick="startExam()" class="mt-4 w-full bg-blue-900 hover:bg-blue-800 text-white font-extrabold py-3.5 rounded-xl text-sm shadow transition">🚀 시험 시작하기!</button>
       </div>
+
       <div id="examPaperBox" class="hidden space-y-4">
         <div class="bg-slate-900 text-white p-3.5 rounded-xl sticky top-[104px] z-20 flex items-center justify-between shadow-lg">
-          <div><span id="examHeaderBadge" class="text-[11px] font-extrabold px-2 py-0.5 rounded bg-rose-600 text-white mr-1">🔥 실전</span><span id="examHeaderTitle" class="text-xs md:text-sm font-bold"></span><span id="examProgressCount" class="ml-2 text-xs text-emerald-300 font-bold"></span></div>
-          <div class="flex items-center space-x-2"><span id="examTimerText" class="text-xs md:text-sm font-mono font-bold text-yellow-300">00:00 / 15:00</span><button onclick="cancelExam()" class="text-[11px] bg-slate-700 px-2 py-1 rounded text-slate-200">포기</button></div>
-        </div>
-        <div id="examQuestionsList" class="space-y-3.5"></div>
-        <button id="submitExamBtn" onclick="submitExam()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-4 rounded-xl text-base shadow-lg transition">✅ 최종 제출 및 채점하기</button>
-      </div>
-      <div id="examResultBox" class="hidden bg-white p-5 rounded-xl shadow-md border-2 border-blue-900 space-y-4"></div>
-    </section>
-
-    <!-- 탭 3: 주간과제 퀴즈 -->
-    <section id="tabContent_core" class="hidden space-y-4">
-      <div id="coreAssignedListBox" class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 space-y-3">
-        <div class="flex items-center justify-between border-b pb-2.5">
-          <div><span class="bg-blue-900 text-yellow-300 text-[10px] font-black px-2 py-0.5 rounded mr-1">ANATOMY CORE</span><h2 class="inline text-sm md:text-base font-extrabold text-slate-900">나의 주간과제 퀴즈 목록</h2></div>
-          <button onclick="forceRefreshWordbook()" class="text-[11px] bg-slate-100 text-slate-600 font-bold px-2.5 py-1 rounded border">🔄 새로고침</button>
-        </div>
-        <div class="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-950 space-y-1">
-          <p>🎯 <b>통과 기준:</b> 10문제 중 <b>9문제(90점) 이상 정답 시 통과!</b> (과제 제출 자동 인정 & 학부모 리포트 반영)</p>
-          <p>💎 <b>장학금 포인트:</b> 1차 통과 <b>+1.0P</b> / 2차 재시 <b>+0.5P</b> / 3차 재시 <b>+0.25P</b> / <b>3회 실패 시 '미제출(0P)' 확정</b></p>
-        </div>
-        <div id="myAssignedCoreContainer" class="space-y-2"></div>
-        <div class="pt-3 border-t flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <span class="text-xs font-bold text-slate-600">📖 자율 복습 모드 (추가 연습 / 0P):</span>
+          <div>
+            <span id="examHeaderBadge" class="text-[11px] font-extrabold px-2 py-0.5 rounded bg-rose-600 text-white mr-1">🔥 실전</span>
+            <span id="examHeaderTitle" class="text-xs md:text-sm font-bold"></span>
+            <span id="examProgressCount" class="ml-2 text-xs text-emerald-300 font-bold"></span>
+          </div>
           <div class="flex items-center space-x-2">
-            <select id="freePracticeCoreSelect" class="border rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-800"></select>
-            <button onclick="startFreePracticeCore()" class="bg-slate-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg shrink-0">연습 풀기</button>
+            <span id="examTimerText" class="text-xs md:text-sm font-mono font-bold text-yellow-300">00:00 / 15:00</span>
+            <button onclick="cancelExam()" class="text-[11px] bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded text-slate-200">포기/재설정</button>
           </div>
         </div>
+
+        <div id="examQuestionsList" class="space-y-3.5"></div>
+
+        <button id="submitExamBtn" onclick="submitExam()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-4 rounded-xl text-base shadow-lg transition">✅ 최종 제출 및 채점하기</button>
       </div>
-      <div id="coreResultBox" class="hidden bg-white p-5 rounded-xl shadow-md border-2 border-blue-900 space-y-4"></div>
-      <div id="corePaperBox" class="hidden space-y-4">
-        <div class="bg-blue-950 text-white p-3.5 rounded-xl sticky top-[104px] z-20 flex items-center justify-between shadow-lg">
-          <div><span id="coreModeBadge" class="text-[11px] font-extrabold px-2 py-0.5 rounded bg-yellow-400 text-blue-950 mr-1">1차 도전 (+1.0P)</span><span id="corePaperTitle" class="text-xs md:text-sm font-extrabold"></span></div>
-          <button onclick="closeCorePaper()" class="text-[11px] bg-slate-700 px-2.5 py-1 rounded text-slate-200">목록으로</button>
-        </div>
-        <div id="coreQuestionsContainer" class="space-y-3.5"></div>
-        <button id="submitCoreQuizBtn" onclick="submitCoreQuiz()" class="w-full bg-blue-900 hover:bg-blue-800 text-white font-black py-4 rounded-xl text-base shadow-lg transition">✅ 답안 제출 및 채점하기</button>
-      </div>
+
+      <div id="examResultBox" class="hidden bg-white p-5 rounded-xl shadow-md border-2 border-blue-900 space-y-4"></div>
     </section>
   </main>
 
@@ -252,8 +293,8 @@
     const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     const SAME_RANGE_COOLDOWN_DAYS = 7;
-    const WORDBOOK_CACHE_KEY = "pqrs_wb_cache_v4";
-    const WORDBOOK_CACHE_TIME_KEY = "pqrs_wb_cache_time_v4";
+    const WORDBOOK_CACHE_KEY = "pqrs_wb_cache_v1";
+    const WORDBOOK_CACHE_TIME_KEY = "pqrs_wb_cache_time_v1";
     const WORDBOOK_CACHE_TTL_MS = 30 * 60 * 1000;
 
     let allStudents = [];
@@ -261,25 +302,22 @@
     let allPoints = [];
     let myVocabTests = [];
     let myRetakes = [];
-    let myAssignments = [];
-    let coreBankMap = {};
 
     let currentStudent = localStorage.getItem("pqrs_student") || "";
     let currentTab = localStorage.getItem("pqrs_tab") || "rank";
     let examTimerInterval = null;
     let isSubmittingExam = false;
-    let isSubmittingCore = false;
 
-    let myVocaMap = {};
-    let isMyVocaViewMode = false;
-
+    // ⏱️ 순수 공부 시간(초) 측정 변수 (3분 이상 무반응 시 자동 일시정지)
     let activeStudySecondsToday = 0;
     let unsavedStudySeconds = 0;
     let lastInteractionTime = Date.now();
     let isSavingStudyTime = false;
-    const MAX_DAILY_STUDY_MINS = 180;
+    const MAX_DAILY_STUDY_MINS = 180; // 하루 최대 180분(3시간)까지 인정
 
-    function markUserInteraction() { lastInteractionTime = Date.now(); }
+    function markUserInteraction() {
+      lastInteractionTime = Date.now();
+    }
     ["click", "touchstart", "keydown", "scroll"].forEach(evt => {
       window.addEventListener(evt, markUserInteraction, { passive: true });
     });
@@ -291,22 +329,35 @@
 
     function getKSTNow() {
       const now = new Date();
-      return new Date(now.getTime() + (now.getTimezoneOffset() * 60000) + (9 * 3600000));
-    }
-    function getKSTDateString() {
-      const t = getKSTNow();
-      return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
+      const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+      return new Date(utc + (9 * 3600000));
     }
 
-    // 1초마다 공부시간 측정 및 서버 전송 (자바스크립트 표준 통신방식 사용으로 .execute() 에러 원천 차단)
+    function getKSTDateString() {
+      const kstTime = getKSTNow();
+      const yyyy = kstTime.getFullYear();
+      const mm = String(kstTime.getMonth() + 1).padStart(2, '0');
+      const dd = String(kstTime.getDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    }
+
+    function getKSTWeekdayKr() {
+      const days = ["일", "월", "화", "수", "목", "금", "토"];
+      return days[getKSTNow().getDay()];
+    }
+
+    // 1초마다 실제 공부 중인지 확인하여 공부 시간 누적 & 60초마다 DB 자동 저장
     setInterval(async () => {
       const badge = document.getElementById("liveStudyTimeBadge");
-      if (!currentStudent) { if (badge) badge.classList.add("hidden"); return; }
+      if (!currentStudent) {
+        if (badge) badge.classList.add("hidden");
+        return;
+      }
       if (badge) badge.classList.remove("hidden");
 
       const isPageVisible = document.visibilityState === "visible";
-      const isStudyingTab = (currentTab === "flash" || currentTab === "exam" || currentTab === "core");
-      const isRecentlyActive = (Date.now() - lastInteractionTime) < 180000;
+      const isStudyingTab = (currentTab === "flash" || currentTab === "exam");
+      const isRecentlyActive = (Date.now() - lastInteractionTime) < 180000; // 3분 이내 터치/클릭 활동
 
       if (isPageVisible && isStudyingTab && isRecentlyActive) {
         activeStudySecondsToday++;
@@ -318,7 +369,7 @@
       if (badge) {
         badge.textContent = (isPageVisible && isStudyingTab && isRecentlyActive)
           ? `⏱️ 공부시간 측정중: 오늘 ${m}분 ${s}초`
-          : `⏸️ 공부시간 일시정지: 오늘 ${m}분 ${s}초`;
+          : `⏸️ 공부시간 일시정지 (암기장·시험 탭에서 작동): 오늘 ${m}분 ${s}초`;
       }
 
       if (unsavedStudySeconds >= 60 && !isSavingStudyTime) {
@@ -340,17 +391,37 @@
           const prevMins = parseStudyMinutesFromDesc(studyRow.내역);
           if (prevMins < MAX_DAILY_STUDY_MINS) {
             const newMins = Math.min(MAX_DAILY_STUDY_MINS, prevMins + addMins);
-            let query = db.from("points").update({ 내역: `[공부시간] ${newMins}분` });
-            if (studyRow.id !== undefined && studyRow.id !== null) query = query.eq("id", studyRow.id);
-            else query = query.eq("날짜", todayStr).eq("이름", stName).eq("내역", studyRow.내역);
-            await query;
+            let q = db.from("points").update({ 내역: `[공부시간] ${newMins}분` });
+            if (studyRow.id !== undefined && studyRow.id !== null) {
+              q = q.eq("id", studyRow.id);
+            } else {
+              q = q.eq("날짜", todayStr).eq("이름", stName).eq("내역", studyRow.내역);
+            }
+            await q;
           }
         } else {
-          await db.from("points").insert({ 날짜: todayStr, 이름: stName, 내역: `[공부시간] ${addMins}분`, 포인트증감: "0" });
+          await safeInsert("points", {
+            날짜: todayStr,
+            이름: stName,
+            내역: `[공부시간] ${addMins}분`,
+            포인트증감: "0"
+          });
+        }
+
+        // 로컬 데이터에도 즉시 반영하여 화면 숫자 갱신
+        const localRow = allPoints.find(p => p.날짜 === todayStr && p.이름 === stName && String(p.내역 || "").startsWith("[공부시간]"));
+        if (localRow) {
+          const pm = parseStudyMinutesFromDesc(localRow.내역);
+          localRow.내역 = `[공부시간] ${Math.min(MAX_DAILY_STUDY_MINS, pm + addMins)}분`;
+        } else {
+          allPoints.push({ 날짜: todayStr, 이름: stName, 내역: `[공부시간] ${addMins}분`, 포인트증감: "0" });
         }
         updateMyStudyTimeCard(stName);
         renderRanking();
-      } catch (e) {} finally { isSavingStudyTime = false; }
+      } catch (e) {
+      } finally {
+        isSavingStudyTime = false;
+      }
     }
 
     function parseStudyMinutesFromDesc(desc) {
@@ -369,218 +440,424 @@
 
     function formatMinutesPretty(mins) {
       if (mins < 60) return `${mins}분`;
-      const h = Math.floor(mins / 60), m = mins % 60;
+      const h = Math.floor(mins / 60);
+      const m = mins % 60;
       return m > 0 ? `${h}시간 ${m}분` : `${h}시간`;
     }
 
-    function playWordAudio(wordText) {
-      markUserInteraction();
-      if (!wordText) return;
-      if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(wordText);
-        utterance.lang = 'en-US';
-        utterance.rate = 0.9;
-        window.speechSynthesis.speak(utterance);
-      }
-    }
+    function switchRankSubTab(mode) {
+      const btnTime = document.getElementById("subTabBtn_time");
+      const btnPoint = document.getElementById("subTabBtn_point");
+      const boxTime = document.getElementById("rankSubBox_time");
+      const boxPoint = document.getElementById("rankSubBox_point");
 
-    // =========================================================================
-    // ⭐ 나만의 모르는 단어장 (자바스크립트 비동기 동기화 - .execute() 충돌 완치)
-    // =========================================================================
-    async function loadMyVocaFromServer(stName) {
-      if (!stName) { myVocaMap = {}; return; }
-      try {
-        const { data } = await db.from("student_memos").select("*").eq("이름", stName).like("메모", "[MYVOCA_DATA]%");
-        if (data && data.length > 0) {
-          const rawJson = String(data[data.length - 1].메모 || "").replace("[MYVOCA_DATA]", "").trim();
-          myVocaMap = JSON.parse(rawJson);
-        } else {
-          myVocaMap = {};
-        }
-      } catch (e) { myVocaMap = {}; }
-      updateMyVocaButtonBadge();
-    }
-
-    async function saveMyVocaToServer(stName) {
-      if (!stName) return;
-      try {
-        const jsonStr = "[MYVOCA_DATA]" + JSON.stringify(myVocaMap);
-        await db.from("student_memos").delete().eq("이름", stName).like("메모", "[MYVOCA_DATA]%");
-        await db.from("student_memos").insert({ 날짜: getKSTDateString(), 이름: stName, 메모: jsonStr });
-      } catch (e) {}
-      updateMyVocaButtonBadge();
-    }
-
-    function updateMyVocaButtonBadge() {
-      const keys = Object.keys(myVocaMap);
-      const btn = document.getElementById("myVocaToggleBtn");
-      if (btn) btn.textContent = `⭐ 나만의 모르는 단어장 (${keys.length}개)`;
-    }
-
-    function toggleMyVocaMode() {
-      isMyVocaViewMode = !isMyVocaViewMode;
-      const btn = document.getElementById("myVocaToggleBtn");
-      const normCtrl = document.getElementById("normalFlashControls");
-      const myCtrl = document.getElementById("myVocaControls");
-      if (isMyVocaViewMode) {
-        btn.className = "text-xs bg-blue-900 text-white font-black px-3 py-1.5 rounded-lg shadow ring-2 ring-amber-400";
-        normCtrl.classList.add("hidden");
-        myCtrl.classList.remove("hidden");
-        renderMyVocaFlashcards();
+      if (mode === "time") {
+        btnTime.className = "py-2.5 rounded-lg text-xs md:text-sm font-extrabold bg-blue-900 text-white shadow";
+        btnPoint.className = "py-2.5 rounded-lg text-xs md:text-sm font-extrabold text-slate-700 hover:bg-slate-100";
+        boxTime.classList.remove("hidden");
+        boxPoint.classList.add("hidden");
       } else {
-        btn.className = "text-xs bg-amber-500 hover:bg-amber-600 text-white font-black px-3 py-1.5 rounded-lg shadow transition";
-        normCtrl.classList.remove("hidden");
-        myCtrl.classList.add("hidden");
-        onFlashCatChange();
-        renderFlashcards();
+        btnPoint.className = "py-2.5 rounded-lg text-xs md:text-sm font-extrabold bg-blue-900 text-white shadow";
+        btnTime.className = "py-2.5 rounded-lg text-xs md:text-sm font-extrabold text-slate-700 hover:bg-slate-100";
+        boxPoint.classList.remove("hidden");
+        boxTime.classList.add("hidden");
       }
     }
 
-    function addWordToMyVoca(english, meaning, pronunciation, korPron, example) {
-      markUserInteraction();
-      const key = String(english || "").trim().toLowerCase();
-      if (!key) return;
-      if (!myVocaMap[key]) {
-        myVocaMap[key] = { count: 1, english, meaning, pronunciation: pronunciation || "", korPron: korPron || "", example: example || "" };
-        alert(`⭐ '${english}' 단어가 나만의 모르는 단어장에 저장되었습니다!`);
-      } else {
-        myVocaMap[key].count = (myVocaMap[key].count || 1) + 1;
-        alert(`⭐ 이미 담겨있는 단어입니다. (누적 체크 ${myVocaMap[key].count}회)`);
-      }
-      saveMyVocaToServer(currentStudent);
-      if (isMyVocaViewMode) renderMyVocaFlashcards();
-    }
+    function getTodayEarlyMinutes(stInfo) {
+      if (!stInfo) return 0;
+      const todayStr = getKSTDateString();
+      const todayWk = getKSTWeekdayKr();
+      const makeupStr = String(stInfo.보충일정 || "");
 
-    function removeWordFromMyVoca(english) {
-      markUserInteraction();
-      const key = String(english || "").trim().toLowerCase();
-      if (myVocaMap[key]) {
-        delete myVocaMap[key];
-        saveMyVocaToServer(currentStudent);
-        alert(`✅ '${english}' 단어가 암기 완료되어 나만의 단어장에서 삭제(졸업)되었습니다!`);
-        if (isMyVocaViewMode) renderMyVocaFlashcards();
-      }
-    }
-
-    function renderMyVocaFlashcards() {
-      const container = document.getElementById("flashcardsContainer");
-      container.innerHTML = "";
-      const keys = Object.keys(myVocaMap);
-      if (keys.length === 0) {
-        container.innerHTML = `<div class="col-span-full text-center py-12 text-slate-500 text-xs bg-white rounded-xl border">⭐ 저장된 모르는 단어가 없습니다. 암기장이나 시험에서 모르는 단어를 찜하거나 틀려보세요!</div>`;
-        return;
-      }
-      document.getElementById("flashGuide").classList.remove("hidden");
-      const sortedKeys = keys.sort((a, b) => myVocaMap[b].count - myVocaMap[a].count);
-
-      sortedKeys.forEach(k => {
-        const item = myVocaMap[k];
-        const card = document.createElement("div");
-        card.className = "flip-card relative";
-        card.innerHTML = `
-          <div class="absolute top-2 right-2 z-10 flex items-center space-x-1">
-            ${item.count > 1 ? `<span class="bg-rose-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full">🔥 ${item.count}회 오답</span>` : ''}
-            <button onclick="event.stopPropagation(); playWordAudio(\`${escapeHtml(item.english).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}\`)" class="bg-blue-900 text-white p-1 rounded-full text-xs shadow">🔊</button>
-          </div>
-          <div class="flip-card-inner" onclick="this.parentElement.classList.toggle('flipped')">
-            <div class="flip-card-front">
-              <span class="text-[11px] text-amber-300 font-bold mb-0.5">⭐ 마이보카 저장됨</span>
-              <h3 class="text-xl font-extrabold tracking-wide">${escapeHtml(item.english)}</h3>
-              <p class="text-xs text-slate-300 mt-1">${escapeHtml(item.pronunciation)}</p>
-              <p class="text-xs text-blue-300 font-bold mt-0.5">${escapeHtml(item.korPron)}</p>
-            </div>
-            <div class="flip-card-back flex flex-col justify-between">
-              <div>
-                <h3 class="text-base font-extrabold text-blue-950">${escapeHtml(item.meaning)}</h3>
-                <p class="text-xs text-slate-600 mt-1.5 leading-snug break-keep">${escapeHtml(item.example)}</p>
-              </div>
-              <button onclick="event.stopPropagation(); removeWordFromMyVoca(\`${escapeHtml(item.english).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}\`)" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-1.5 rounded-lg shadow">✅ 외웠어요! 목록에서 빼기</button>
-            </div>
-          </div>
-        `;
-        container.appendChild(card);
-      });
-    }
-
-    function startMyVocaMiniTest() {
-      const keys = Object.keys(myVocaMap);
-      if (keys.length === 0) { alert("테스트할 모르는 단어가 없습니다!"); return; }
-      const modal = document.getElementById("myVocaTestModal");
-      const body = document.getElementById("myVocaTestBody");
-      modal.classList.remove("hidden");
-
-      const testItems = shuffleArray(Object.values(myVocaMap)).slice(0, 5);
-      const allMeanings = Object.values(myVocaMap).map(i => i.meaning);
-
-      body.innerHTML = testItems.map((item, idx) => {
-        const wrongs = shuffleArray(allMeanings.filter(m => m !== item.meaning)).slice(0, 3);
-        while (wrongs.length < 3) wrongs.push(`오답 보기 ${wrongs.length+1}`);
-        const opts = shuffleArray([item.meaning, ...wrongs]);
-        return `
-          <div class="bg-slate-50 p-3.5 rounded-xl border space-y-2" id="myTestQ_${idx}">
-            <p class="text-xs font-bold text-slate-700">Q${idx+1}. '${escapeHtml(item.english)}'의 뜻은?</p>
-            <div class="grid grid-cols-2 gap-2">
-              ${opts.map((opt, oI) => `<button type="button" onclick="answerMyVocaTest(${idx}, \`${escapeHtml(opt).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}\`, \`${escapeHtml(item.meaning).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}\`, \`${escapeHtml(item.english).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}\`)" class="py-2 px-2.5 rounded-lg border bg-white text-xs font-bold text-left hover:bg-blue-50">${oI+1}. ${escapeHtml(opt)}</button>`).join("")}
-            </div>
-          </div>
-        `;
-      }).join("") + `<div id="myTestResultBox" class="text-center font-extrabold text-sm text-blue-900"></div>`;
-    }
-
-    function answerMyVocaTest(qIdx, chosen, correct, english) {
-      const qBox = document.getElementById(`myTestQ_${qIdx}`);
-      const btns = qBox.querySelectorAll("button");
-      btns.forEach(b => b.disabled = true);
-      if (chosen === correct) {
-        qBox.className = "bg-emerald-50 p-3.5 rounded-xl border-2 border-emerald-500 space-y-2";
-        qBox.insertAdjacentHTML("beforeend", `<p class="text-xs font-black text-emerald-700">정답! 🎉 이 단어는 나만의 단어장에서 자동 졸업(삭제)됩니다.</p>`);
-        removeWordFromMyVoca(english);
-      } else {
-        qBox.className = "bg-rose-50 p-3.5 rounded-xl border-2 border-rose-500 space-y-2";
-        qBox.insertAdjacentHTML("beforeend", `<p class="text-xs font-black text-rose-700">오답! 🥲 정답: ${correct}</p>`);
-      }
-    }
-
-    function closeMyVocaTest() {
-      document.getElementById("myVocaTestModal").classList.add("hidden");
-      if (isMyVocaViewMode) renderMyVocaFlashcards();
-    }
-
-    async function autoAddWrongWordsToMyVoca(wrongItems) {
-      if (!currentStudent || !Array.isArray(wrongItems)) return;
-      let addedCnt = 0;
-      wrongItems.forEach(w => {
-        const eng = String(w.영어단어 || "").trim();
-        const mean = String(w.정답뜻 || "").trim();
-        if (eng && mean) {
-          const key = eng.toLowerCase();
-          if (!myVocaMap[key]) {
-            myVocaMap[key] = { count: 1, english: eng, meaning: mean, pronunciation: "", korPron: "", example: "" };
-            addedCnt++;
-          } else {
-            myVocaMap[key].count = (myVocaMap[key].count || 1) + 1;
+      if (makeupStr.includes(todayStr)) {
+        for (const item of makeupStr.split(",")) {
+          const s = item.trim();
+          if (s.startsWith(todayStr) && s.includes("(") && s.includes(")")) {
+            const inner = s.split("(")[1].replace(")", "").trim();
+            if (inner.includes("/")) {
+              return parseInt(inner.split("/")[1], 10) || 0;
+            }
+            return 0;
           }
         }
-      });
-      if (addedCnt > 0 || wrongItems.length > 0) {
-        await saveMyVocaToServer(currentStudent);
+      }
+
+      const schedStr = String(stInfo.등원일정 || "").trim();
+      const legacyEarly = parseInt(stInfo["사전등원(분)"], 10) || 0;
+      if (schedStr) {
+        const hasSlash = schedStr.includes("/");
+        for (const item of schedStr.split(",")) {
+          const s = item.trim();
+          if (s.startsWith(todayWk) && s.includes("(") && s.includes(")")) {
+            const inner = s.split("(")[1].replace(")", "").trim();
+            if (inner.includes("/")) {
+              return parseInt(inner.split("/")[1], 10) || 0;
+            }
+            return hasSlash ? 0 : legacyEarly;
+          }
+        }
+        return 0;
+      }
+      return legacyEarly;
+    }
+
+    function getEarlyDaysSummaryText(stInfo) {
+      if (!stInfo) return "";
+      const schedStr = String(stInfo.등원일정 || "").trim();
+      const legacyEarly = parseInt(stInfo["사전등원(분)"], 10) || 0;
+      if (!schedStr) return legacyEarly > 0 ? `사전등원(${legacyEarly}분전)` : "";
+      const hasSlash = schedStr.includes("/");
+      const list = [];
+      for (const item of schedStr.split(",")) {
+        const s = item.trim();
+        if (s.includes("(") && s.includes(")")) {
+          const d = s.split("(")[0].trim();
+          const inner = s.split("(")[1].replace(")", "").trim();
+          if (inner.includes("/")) {
+            const eVal = parseInt(inner.split("/")[1], 10) || 0;
+            if (eVal > 0) list.push(`${d}(${eVal}분전)`);
+          } else if (!hasSlash && legacyEarly > 0) {
+            list.push(`${d}(${legacyEarly}분전)`);
+          }
+        }
+      }
+      return list.join(", ");
+    }
+
+    function getDaysDiff(dateStr1, dateStr2) {
+      const d1 = new Date(dateStr1);
+      const d2 = new Date(dateStr2);
+      return Math.round((d1 - d2) / (1000 * 60 * 60 * 24));
+    }
+
+    function escapeHtml(str) {
+      return String(str ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function maskName(name) {
+      if (!name || name.length < 2) return name;
+      if (name.length === 2) return name[0] + "*";
+      return name[0] + "*".repeat(name.length - 2) + name[name.length - 1];
+    }
+
+    function extractPureRange(text) {
+      if (!text || typeof text !== 'string') return "";
+      try {
+        if (text.includes(']')) return text.split(']')[1].split('(')[0].trim();
+        return text.split('(')[0].trim();
+      } catch (e) { return text; }
+    }
+
+    async function fetchAllRows(tableName, selectCols = "*") {
+      let allData = [];
+      let from = 0;
+      const step = 1000;
+      while (true) {
+        const { data, error } = await db.from(tableName).select(selectCols).range(from, from + step - 1);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        allData = allData.concat(data);
+        if (data.length < step) break;
+        from += step;
+      }
+      return allData;
+    }
+
+    async function loadWordbookSmart(forceRefresh = false) {
+      if (!forceRefresh) {
+        try {
+          const cachedTime = parseInt(localStorage.getItem(WORDBOOK_CACHE_TIME_KEY), 10) || 0;
+          const cachedJson = localStorage.getItem(WORDBOOK_CACHE_KEY);
+          if (cachedJson && (Date.now() - cachedTime < WORDBOOK_CACHE_TTL_MS)) {
+            const parsed = JSON.parse(cachedJson);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              return parsed;
+            }
+          }
+        } catch (e) {}
+      }
+      const wbData = await fetchAllRows("wordbook", "*");
+      const formatted = (wbData || []).map(w => ({
+        ...w,
+        단어번호: parseInt(w.단어번호, 10) || 0,
+        영어단어: String(w.영어단어 ?? "").trim(),
+        뜻: String(w.뜻 ?? "").trim()
+      }));
+      try {
+        localStorage.setItem(WORDBOOK_CACHE_KEY, JSON.stringify(formatted));
+        localStorage.setItem(WORDBOOK_CACHE_TIME_KEY, String(Date.now()));
+      } catch (e) {}
+      return formatted;
+    }
+
+    async function forceRefreshWordbook() {
+      try {
+        allWordbook = await loadWordbookSmart(true);
+        initWordbookCategories();
+        alert("✅ 최신 단어장 데이터를 성공적으로 불러왔습니다!");
+      } catch (e) {
+        alert("단어장 새로고침 실패: " + e.message);
       }
     }
 
-    // =========================================================================
-    // 기본 암기장 & 시험 로직
-    // =========================================================================
+    async function safeInsert(tableName, rowObj, retries = 4) {
+      for (let i = 0; i < retries; i++) {
+        const { error } = await db.from(tableName).insert(rowObj);
+        if (!error) return true;
+        if (i < retries - 1) await new Promise(r => setTimeout(r, 700));
+        else throw error;
+      }
+      return false;
+    }
+
+    async function initApp() {
+      if (navigator.userAgent.toLowerCase().includes("kakaotalk")) {
+        document.getElementById("kakaoFallbackBanner").classList.remove("hidden");
+      }
+
+      try {
+        const [stData, ptData, wbData] = await Promise.all([
+          fetchAllRows("students", "*"),
+          fetchAllRows("points", "날짜, 이름, 내역, 포인트증감"),
+          loadWordbookSmart(false)
+        ]);
+
+        allStudents = stData || [];
+        allPoints = ptData || [];
+        allWordbook = wbData || [];
+
+        const activeList = allStudents.filter(s => s.상태 === "재원").map(s => s.이름).sort();
+        const selectEl = document.getElementById("studentSelect");
+        selectEl.innerHTML = '<option value="">👉 내 이름 선택</option>';
+        activeList.forEach(name => {
+          const opt = document.createElement("option");
+          opt.value = name;
+          opt.textContent = name;
+          if (name === currentStudent) opt.selected = true;
+          selectEl.appendChild(opt);
+        });
+
+        initWordbookCategories();
+        renderRanking();
+
+        document.getElementById("globalLoader").classList.add("hidden");
+
+        if (currentStudent && activeList.includes(currentStudent)) {
+          localStorage.setItem("pqrs_student", currentStudent);
+          await loadStudentPersonalData(currentStudent);
+        } else {
+          currentStudent = "";
+          localStorage.removeItem("pqrs_student");
+        }
+
+        switchTab(currentTab);
+        restoreOngoingExamIfAny();
+      } catch (err) {
+        alert("데이터를 불러오는 중 일시적 네트워크 오류가 발생했습니다. 화면을 새로고침 해주세요: " + err.message);
+      }
+    }
+
+    function initWordbookCategories() {
+      const cats = [...new Set(allWordbook.map(w => w.분류).filter(Boolean))];
+      const flashCatEl = document.getElementById("flashCat");
+      const examCatEl = document.getElementById("examCat");
+      flashCatEl.innerHTML = "";
+      examCatEl.innerHTML = "";
+      cats.forEach(c => {
+        flashCatEl.add(new Option(c, c));
+        examCatEl.add(new Option(c, c));
+      });
+      if (cats.length > 0) {
+        onFlashCatChange();
+        onExamCatChange();
+      }
+    }
+
+    function onFlashCatChange() {
+      const cat = document.getElementById("flashCat").value;
+      const filtered = allWordbook.filter(w => w.분류 === cat);
+      if (!filtered.length) return;
+      const nums = filtered.map(w => w.단어번호);
+      document.getElementById("flashStart").value = Math.min(...nums);
+      document.getElementById("flashEnd").value = Math.max(...nums);
+    }
+
+    function onExamCatChange() {
+      const cat = document.getElementById("examCat").value;
+      const filtered = allWordbook.filter(w => w.분류 === cat);
+      if (!filtered.length) return;
+      const nums = filtered.map(w => w.단어번호);
+      document.getElementById("examStart").value = Math.min(...nums);
+      document.getElementById("examEnd").value = Math.max(...nums);
+    }
+
+    async function onStudentChange() {
+      const selected = document.getElementById("studentSelect").value;
+      currentStudent = selected;
+      unsavedStudySeconds = 0;
+      if (selected) {
+        localStorage.setItem("pqrs_student", selected);
+        await loadStudentPersonalData(selected);
+        restoreOngoingExamIfAny();
+      } else {
+        localStorage.removeItem("pqrs_student");
+        document.getElementById("studentDashboard").classList.add("hidden");
+      }
+      switchTab(currentTab);
+    }
+
+    async function loadStudentPersonalData(stName) {
+      document.getElementById("studentDashboard").classList.remove("hidden");
+      const stInfo = allStudents.find(s => s.이름 === stName) || {};
+      const myGradeRaw = String(stInfo.학년 || "");
+      const myGrade = myGradeRaw ? myGradeRaw.replace(/고|학년/g, "").trim() + "학년" : "";
+      const earlySummaryText = getEarlyDaysSummaryText(stInfo);
+
+      const [ptRes, attRes, vocRes, hwRes, wkRes] = await Promise.all([
+        db.from("points").select("날짜, 이름, 내역, 포인트증감").eq("이름", stName),
+        db.from("attendance").select("출결, 사전등원달성").eq("이름", stName),
+        db.from("vocab_tests").select("날짜, 이름, 점수, 결과, 비고").eq("이름", stName),
+        db.from("assignments").select("과제명, 결과, 날짜").eq("이름", stName).eq("결과", "진행중"),
+        myGrade ? db.from("weekly_progress").select("*").eq("학년", myGrade) : Promise.resolve({ data: [] })
+      ]);
+
+      const myPtData = ptRes.data || [];
+      const myPts = myPtData.reduce((acc, cur) => acc + (parseFloat(cur.포인트증감) || 0), 0);
+      document.getElementById("myPointsText").textContent = `${Number(myPts.toFixed(1))} P`;
+
+      // 나의 오늘 및 누적 공부시간 반영
+      const todayStr = getKSTDateString();
+      const todayStudyRow = myPtData.find(r => r.날짜 === todayStr && String(r.내역 || "").startsWith("[공부시간]"));
+      const todaySavedMins = todayStudyRow ? parseStudyMinutesFromDesc(todayStudyRow.내역) : 0;
+      activeStudySecondsToday = (todaySavedMins * 60) + unsavedStudySeconds;
+
+      const totalStudyMins = myPtData
+        .filter(r => String(r.내역 || "").startsWith("[공부시간]"))
+        .reduce((acc, r) => acc + parseStudyMinutesFromDesc(r.내역), 0);
+      document.getElementById("myStudyTimeText").textContent = formatMinutesPretty(totalStudyMins);
+
+      const attData = attRes.data || [];
+      const attC = attData.filter(x => x.출결 === "출석").length;
+      const mkC = attData.filter(x => x.출결 === "보충").length;
+      const lateC = attData.filter(x => x.출결 === "지각").length;
+      const absC = attData.filter(x => x.출결 === "결석").length;
+      const earlyC = attData.filter(x => x.사전등원달성 === "성공").length;
+      let attHtml = `출석 ${attC} / 보충 ${mkC}<br>지각 ${lateC} / 결석 ${absC}`;
+      if (earlySummaryText || earlyC > 0) {
+        attHtml += `<br><span class="text-indigo-700">일찍오기: ${earlyC}회</span>`;
+      }
+      document.getElementById("myAttText").innerHTML = attHtml;
+
+      myVocabTests = vocRes.data || [];
+      const grouped = {};
+      myVocabTests.forEach(row => {
+        const pr = extractPureRange(row.비고);
+        if (!pr) return;
+        if (!grouped[pr]) grouped[pr] = [];
+        grouped[pr].push(row);
+      });
+
+      myRetakes = [];
+      Object.keys(grouped).forEach(pr => {
+        const list = grouped[pr];
+        list.sort((a, b) => String(a.날짜).localeCompare(String(b.날짜)));
+        const lastExam = list[list.length - 1];
+        const resStr = String(lastExam.결과 || "");
+        if (resStr.includes("미통과") || resStr.includes("미응시")) {
+          myRetakes.push({ range: pr, date: lastExam.날짜, count: list.length });
+        }
+      });
+
+      const alertsBox = document.getElementById("myAlertsText");
+      const hws = hwRes.data || [];
+      let alertLines = [];
+      if (myRetakes.length > 0) {
+        alertLines.push(`🚨 <b>단어 재시: ${myRetakes.length}건</b>`);
+      }
+      if (hws.length > 0) {
+        alertLines.push(`📝 <b>미제출 과제: ${hws.length}건</b>`);
+      }
+      alertsBox.innerHTML = alertLines.length > 0 ? alertLines.join("<br>") : "<span class='text-emerald-700 font-bold'>🎉 모두 완료!</span>";
+
+      renderRetakeQuickButtons();
+
+      const wkBox = document.getElementById("weeklyProgressBox");
+      if (wkRes.data && wkRes.data.length > 0) {
+        const nonEmptyRows = wkRes.data.filter(r =>
+          String(r["1회차수업"] || "").trim() ||
+          String(r["2회차수업"] || "").trim() ||
+          String(r["클리닉"] || "").trim()
+        );
+        const w = nonEmptyRows.length > 0 ? nonEmptyRows[nonEmptyRows.length - 1] : wkRes.data[wkRes.data.length - 1];
+        document.getElementById("weeklyTitle").textContent = `📢 나의 이번 주 학습 진도 및 단어 범위 (${myGrade}) - 업데이트: ${w.업데이트일자 || ''}`;
+        document.getElementById("weekly1").textContent = String(w["1회차수업"] || "").trim() || "-";
+        document.getElementById("weekly2").textContent = String(w["2회차수업"] || "").trim() || "-";
+        document.getElementById("weeklyClinic").textContent = String(w["클리닉"] || "").trim() || "-";
+        wkBox.classList.remove("hidden");
+      } else {
+        wkBox.classList.add("hidden");
+      }
+    }
+
+    function renderRetakeQuickButtons() {
+      const box = document.getElementById("examRetakeQuickBox");
+      const btnContainer = document.getElementById("examRetakeButtons");
+      btnContainer.innerHTML = "";
+      if (!myRetakes.length) {
+        box.classList.add("hidden");
+        return;
+      }
+      box.classList.remove("hidden");
+      myRetakes.forEach(r => {
+        const div = document.createElement("div");
+        div.className = "flex items-center justify-between bg-white px-3 py-2 rounded-lg border border-rose-200 text-xs";
+        div.innerHTML = `<span class="font-bold text-rose-900">📌 ${escapeHtml(r.range)} <span class="font-normal text-slate-500">(발생일: ${escapeHtml(r.date)})</span></span>`;
+        const btn = document.createElement("button");
+        btn.className = "bg-rose-600 hover:bg-rose-700 text-white font-bold px-3 py-1.5 rounded shadow-sm shrink-0 ml-2";
+        btn.textContent = "👉 바로 시험 보기";
+        btn.onclick = () => applyRetakeRange(r.range);
+        div.appendChild(btn);
+        btnContainer.appendChild(div);
+      });
+    }
+
+    function applyRetakeRange(rangeStr) {
+      try {
+        const lastSpaceIdx = rangeStr.lastIndexOf(" ");
+        const cat = rangeStr.substring(0, lastSpaceIdx).trim();
+        const numsPart = rangeStr.substring(lastSpaceIdx + 1).replace("번", "").split("~");
+        const sNum = parseInt(numsPart[0], 10);
+        const eNum = parseInt(numsPart[1], 10);
+
+        document.getElementById("examCat").value = cat;
+        document.getElementById("examStart").value = sNum;
+        document.getElementById("examEnd").value = eNum;
+        document.querySelector('input[name="examMode"][value="real"]').checked = true;
+        window.scrollTo({ top: document.getElementById("examSetupBox").offsetTop - 120, behavior: "smooth" });
+      } catch (e) {
+        alert("범위를 자동으로 넣지 못했습니다. 아래에서 직접 선택해 주세요.");
+      }
+    }
+
     function switchTab(tabName) {
       currentTab = tabName;
       localStorage.setItem("pqrs_tab", tabName);
       markUserInteraction();
 
-      ["rank", "flash", "exam", "core"].forEach(t => {
+      ["rank", "flash", "exam"].forEach(t => {
         const btn = document.getElementById(`tabBtn_${t}`);
         const content = document.getElementById(`tabContent_${t}`);
-        if (t === tabName) btn.className = "flex-1 py-3 text-center border-b-4 border-yellow-400 text-yellow-300";
-        else btn.className = "flex-1 py-3 text-center border-b-4 border-transparent text-blue-200";
+        if (t === tabName) {
+          btn.className = "flex-1 py-3 text-center border-b-4 border-yellow-400 text-yellow-300";
+        } else {
+          btn.className = "flex-1 py-3 text-center border-b-4 border-transparent text-blue-200";
+        }
         content.classList.add("hidden");
       });
 
@@ -594,28 +871,46 @@
     }
 
     function renderRanking() {
+      // 1) 시크릿 선물 당첨자 명예의 전당 렌더링
       const giftRows = allPoints.filter(p => String(p.내역 || "").startsWith("[시크릿선물]"));
       const giftBox = document.getElementById("secretGiftHonorBox");
       const giftListEl = document.getElementById("secretGiftList");
       if (giftRows.length > 0) {
         giftBox.classList.remove("hidden");
-        giftListEl.innerHTML = [...giftRows].reverse().slice(0, 8).map(g => `<div class="bg-white/90 border border-amber-300 rounded-lg px-3 py-2 flex items-center justify-between"><span>🎉 <b>${escapeHtml(maskName(g.이름))}</b> 학생 <span class="text-slate-400 font-normal">(${escapeHtml(g.날짜 || '')})</span></span><span class="bg-amber-500 text-white px-2.5 py-0.5 rounded-full text-xs font-extrabold">🎁 ${escapeHtml(String(g.내역).replace("[시크릿선물]","").trim())}</span></div>`).join("");
-      } else giftBox.classList.add("hidden");
+        const recentGifts = [...giftRows].reverse().slice(0, 8);
+        giftListEl.innerHTML = recentGifts.map(g => {
+          const giftName = String(g.내역 || "").replace("[시크릿선물]", "").trim();
+          return `
+            <div class="bg-white/90 border border-amber-300 rounded-lg px-3 py-2 flex items-center justify-between">
+              <span>🎉 <b>${escapeHtml(maskName(g.이름))}</b> 학생 <span class="text-slate-400 font-normal">(${escapeHtml(g.날짜 || '')})</span></span>
+              <span class="bg-amber-500 text-white px-2.5 py-0.5 rounded-full text-xs font-extrabold">🎁 ${escapeHtml(giftName)}</span>
+            </div>
+          `;
+        }).join("");
+      } else {
+        giftBox.classList.add("hidden");
+      }
 
+      // 2) 50P 장학금 수령 명예의 전당
       const payouts = allPoints.filter(p => (parseFloat(p.포인트증감) || 0) <= -50);
       if (payouts.length > 0) {
-        document.getElementById("honorNames").textContent = [...new Set(payouts.map(p => maskName(p.이름)))].join(" / ") + " 학생이 50P를 달성하여 장학금을 수령했습니다!";
+        const honorNames = [...new Set(payouts.map(p => maskName(p.이름)))];
+        document.getElementById("honorNames").textContent = honorNames.join(" / ") + " 학생이 50P를 달성하여 장학금을 수령했습니다!";
         document.getElementById("honorBox").classList.remove("hidden");
       }
 
       const validStudents = allStudents.filter(s => s.상태 === "재원" || s.상태 === "휴원");
-      const timeMap = {}, daysMap = {};
+
+      // 3) 열공 단어왕 (순수 공부시간 분) 집계
+      const timeMap = {};
+      const daysMap = {};
       allPoints.forEach(p => {
-        if (String(p.내역 || "").startsWith("[공부시간]")) {
-          const mins = parseStudyMinutesFromDesc(p.내역);
+        const desc = String(p.내역 || "");
+        if (desc.startsWith("[공부시간]")) {
+          const mins = parseStudyMinutesFromDesc(desc);
           if (mins > 0) {
             timeMap[p.이름] = (timeMap[p.이름] || 0) + mins;
-            daysMap[p.이름] = daysMap[p.이름] || new Set();
+            if (!daysMap[p.이름]) daysMap[p.이름] = new Set();
             if (p.날짜) daysMap[p.이름].add(p.날짜);
           }
         }
@@ -628,36 +923,88 @@
         공부시간분: timeMap[s.이름] || 0
       })).sort((a, b) => (b.공부시간분 - a.공부시간분) || (b.학습일수 - a.학습일수));
 
-      document.getElementById("studyTimeRankingBody").innerHTML = rankedTime.map((r, idx) => `<tr class="${idx < 3 ? 'bg-amber-50/70 font-semibold' : ''}"><td class="px-4 py-2.5">${idx===0?'🥇 1위':idx===1?'🥈 2위':idx===2?'🥉 3위':`${idx+1}위`}</td><td class="px-4 py-2.5 font-bold">${escapeHtml(r.학생명)}</td><td class="px-4 py-2.5 text-xs text-slate-600">${escapeHtml(r.학교학년)}</td><td class="px-4 py-2.5 text-center">${r.학습일수}일</td><td class="px-4 py-2.5 text-right font-extrabold text-amber-800">${formatMinutesPretty(r.공부시간분)}</td></tr>`).join("");
+      const timeTbody = document.getElementById("studyTimeRankingBody");
+      timeTbody.innerHTML = "";
+      rankedTime.forEach((r, idx) => {
+        const tr = document.createElement("tr");
+        tr.className = idx < 3 ? "bg-amber-50/70 font-semibold" : "";
+        const medal = idx === 0 ? "🥇 1위" : idx === 1 ? "🥈 2위" : idx === 2 ? "🥉 3위" : `${idx + 1}위`;
+        tr.innerHTML = `
+          <td class="px-4 py-2.5 text-slate-700">${medal}</td>
+          <td class="px-4 py-2.5 text-slate-900 font-bold">${escapeHtml(r.학생명)}</td>
+          <td class="px-4 py-2.5 text-slate-600 text-xs">${escapeHtml(r.학교학년)}</td>
+          <td class="px-4 py-2.5 text-center text-slate-700">${r.학습일수}일</td>
+          <td class="px-4 py-2.5 text-right font-extrabold text-amber-800">${formatMinutesPretty(r.공부시간분)} <span class="text-xs font-normal text-slate-500">(${r.공부시간분}분)</span></td>
+        `;
+        timeTbody.appendChild(tr);
+      });
 
+      // 4) 장학금 포인트 랭킹 집계
       const ptMap = {};
-      allPoints.forEach(p => { ptMap[p.이름] = (ptMap[p.이름] || 0) + (parseFloat(p.포인트증감) || 0); });
-      const rankedPt = validStudents.map(s => ({ 학생명: maskName(s.이름), 학교: s.학교 || "", 학년: String(s.학년 || "").replace(/고|학년/g, "").trim() + "학년", 포인트: ptMap[s.이름] || 0 })).sort((a, b) => b.포인트 - a.포인트);
-      document.getElementById("rankingTableBody").innerHTML = rankedPt.map((r, idx) => `<tr class="${idx < 3 ? 'bg-yellow-50/50 font-semibold' : ''}"><td class="px-4 py-2.5">${idx===0?'🥇 1위':idx===1?'🥈 2위':idx===2?'🥉 3위':`${idx+1}위`}</td><td class="px-4 py-2.5 font-bold">${escapeHtml(r.학생명)}</td><td class="px-4 py-2.5 text-slate-600">${escapeHtml(r.학교)}</td><td class="px-4 py-2.5 text-slate-600">${escapeHtml(r.학년)}</td><td class="px-4 py-2.5 text-right font-extrabold text-blue-900">${Number(r.포인트.toFixed(2))} P</td></tr>`).join("");
+      allPoints.forEach(p => {
+        const val = parseFloat(p.포인트증감) || 0;
+        ptMap[p.이름] = (ptMap[p.이름] || 0) + val;
+      });
+
+      const rankedPt = validStudents.map(s => ({
+        학생명: maskName(s.이름),
+        학교: s.학교 || "",
+        학년: String(s.학년 || "").replace(/고|학년/g, "").trim() + "학년",
+        포인트: ptMap[s.이름] || 0
+      })).sort((a, b) => b.포인트 - a.포인트);
+
+      const tbody = document.getElementById("rankingTableBody");
+      tbody.innerHTML = "";
+      rankedPt.forEach((r, idx) => {
+        const tr = document.createElement("tr");
+        tr.className = idx < 3 ? "bg-yellow-50/50 font-semibold" : "";
+        const medal = idx === 0 ? "🥇 1위" : idx === 1 ? "🥈 2위" : idx === 2 ? "🥉 3위" : `${idx + 1}위`;
+        tr.innerHTML = `
+          <td class="px-4 py-2.5 text-slate-700">${medal}</td>
+          <td class="px-4 py-2.5 text-slate-900 font-bold">${escapeHtml(r.학생명)}</td>
+          <td class="px-4 py-2.5 text-slate-600">${escapeHtml(r.학교)}</td>
+          <td class="px-4 py-2.5 text-slate-600">${escapeHtml(r.학년)}</td>
+          <td class="px-4 py-2.5 text-right font-extrabold text-blue-900">${Number(r.포인트.toFixed(1))} P</td>
+        `;
+        tbody.appendChild(tr);
+      });
     }
 
     function renderFlashcards() {
-      if (isMyVocaViewMode) return;
       markUserInteraction();
       const cat = document.getElementById("flashCat").value;
       const sNum = parseInt(document.getElementById("flashStart").value, 10) || 0;
       const eNum = parseInt(document.getElementById("flashEnd").value, 10) || 0;
-      const list = getPureVocabWordbook().filter(w => w.분류 === cat && w.단어번호 >= sNum && w.단어번호 <= eNum);
+
+      const list = allWordbook.filter(w => w.분류 === cat && w.단어번호 >= sNum && w.단어번호 <= eNum);
       const container = document.getElementById("flashcardsContainer");
       container.innerHTML = "";
-      if (!list.length) { alert("해당 범위에 단어가 없습니다."); return; }
+
+      if (!list.length) {
+        alert("해당 범위에 단어가 없습니다.");
+        return;
+      }
+
       document.getElementById("flashGuide").classList.remove("hidden");
       list.forEach(w => {
         const card = document.createElement("div");
-        card.className = "flip-card relative";
+        card.className = "flip-card";
+        card.onclick = () => {
+          markUserInteraction();
+          card.classList.toggle("flipped");
+        };
         card.innerHTML = `
-          <div class="absolute top-2 right-2 z-10 flex items-center space-x-1">
-            <button onclick="event.stopPropagation(); playWordAudio(\`${escapeHtml(w.영어단어).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}\`)" class="bg-blue-900 text-white p-1 rounded-full text-xs shadow">🔊</button>
-            <button onclick="event.stopPropagation(); addWordToMyVoca(\`${escapeHtml(w.영어단어).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}\`, \`${escapeHtml(w.뜻).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}\`, \`${escapeHtml(w.발음기호).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}\`, \`${escapeHtml(w.한글발음).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}\`, \`${escapeHtml(w.예문).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}\`)" class="bg-amber-500 text-white px-2 py-0.5 rounded text-[11px] font-bold shadow">☆ 담기</button>
-          </div>
-          <div class="flip-card-inner" onclick="this.parentElement.classList.toggle('flipped')">
-            <div class="flip-card-front"><span class="text-[11px] text-blue-200 mb-0.5">#${w.단어번호}</span><h3 class="text-xl font-extrabold tracking-wide">${escapeHtml(w.영어단어)}</h3><p class="text-xs text-slate-300 mt-1">${escapeHtml(w.발음기호)}</p><p class="text-xs text-blue-300 font-bold mt-0.5">${escapeHtml(w.한글발음)}</p></div>
-            <div class="flip-card-back"><h3 class="text-base font-extrabold text-blue-950">${escapeHtml(w.뜻)}</h3><p class="text-xs text-slate-600 mt-2 leading-snug break-keep">${escapeHtml(w.예문)}</p></div>
+          <div class="flip-card-inner">
+            <div class="flip-card-front">
+              <span class="text-[11px] text-blue-200 mb-0.5">#${w.단어번호}</span>
+              <h3 class="text-xl font-extrabold tracking-wide">${escapeHtml(w.영어단어)}</h3>
+              <p class="text-xs text-slate-300 mt-1">${escapeHtml(w.발음기호)}</p>
+              <p class="text-xs text-blue-300 font-bold mt-0.5">${escapeHtml(w.한글발음)}</p>
+            </div>
+            <div class="flip-card-back">
+              <h3 class="text-base font-extrabold text-blue-950">${escapeHtml(w.뜻)}</h3>
+              <p class="text-xs text-slate-600 mt-2 leading-snug break-keep">${escapeHtml(w.예문)}</p>
+            </div>
           </div>
         `;
         container.appendChild(card);
@@ -674,7 +1021,10 @@
     }
 
     async function startExam() {
-      if (!currentStudent) { alert("오른쪽 위에서 '내 이름'을 먼저 선택해 주세요!"); return; }
+      if (!currentStudent) {
+        alert("화면 오른쪽 위에서 '내 이름'을 먼저 선택해 주세요!");
+        return;
+      }
       markUserInteraction();
       const cat = document.getElementById("examCat").value;
       const sNum = parseInt(document.getElementById("examStart").value, 10) || 0;
@@ -685,24 +1035,56 @@
       const todayStr = getKSTDateString();
 
       if (mode === "real") {
-        const recentPassed = myVocabTests.find(v => extractPureRange(v.비고) === pureRange && String(v.결과 || "").startsWith("통과") && getDaysDiff(todayStr, v.날짜) >= 0 && getDaysDiff(todayStr, v.날짜) < SAME_RANGE_COOLDOWN_DAYS);
-        if (recentPassed) { alert(`🚨 [${pureRange}] 범위는 최근(${recentPassed.날짜})에 이미 통과한 시험입니다!`); return; }
+        const recentPassed = myVocabTests.find(v => {
+          if (extractPureRange(v.비고) !== pureRange) return false;
+          if (!String(v.결과 || "").startsWith("통과")) return false;
+          const diff = getDaysDiff(todayStr, v.날짜);
+          return diff >= 0 && diff < SAME_RANGE_COOLDOWN_DAYS;
+        });
+
+        if (recentPassed) {
+          alert(`🚨 [${pureRange}] 범위는 최근(${recentPassed.날짜})에 이미 '통과'한 시험입니다!\n\n• 동일한 범위는 통과한 날로부터 ${SAME_RANGE_COOLDOWN_DAYS}일이 지난 뒤(2주 뒤 복습 시험 등) 다시 실전 모드로 응시할 수 있습니다.\n• 지금 바로 자율 복습을 원하시면 '🛠️ 연습 모드'를 선택해 주세요!`);
+          return;
+        }
       }
 
-      const pureWb = getPureVocabWordbook();
-      const pool = pureWb.filter(w => w.분류 === cat && w.단어번호 >= sNum && w.단어번호 <= eNum);
-      if (pool.length < qCount) { alert(`단어가 ${pool.length}개뿐이라 ${qCount}문항을 출제할 수 없습니다.`); return; }
+      const pool = allWordbook.filter(w => w.분류 === cat && w.단어번호 >= sNum && w.단어번호 <= eNum);
+      if (pool.length < qCount) {
+        alert(`지정한 범위의 단어가 ${pool.length}개뿐이라 ${qCount}문항을 출제할 수 없습니다. 범위를 넓히거나 문항 수를 줄여주세요.`);
+        return;
+      }
 
-      const allMeanings = [...new Set(pureWb.map(w => w.뜻).filter(Boolean))];
+      const allMeanings = [...new Set(allWordbook.map(w => w.뜻).filter(Boolean))];
       const sampled = shuffleArray(pool).slice(0, qCount);
+
       const questions = sampled.map((q, idx) => {
-        const wrongs = shuffleArray(allMeanings.filter(m => m !== q.뜻)).slice(0, 4);
+        const wrongPool = allMeanings.filter(m => m !== q.뜻);
+        const wrongs = shuffleArray(wrongPool).slice(0, 4);
         while (wrongs.length < 4) wrongs.push(`오답 보기 ${wrongs.length + 1}`);
         const options = shuffleArray([q.뜻, ...wrongs]);
-        return { idx: idx + 1, 단어번호: q.단어번호, 영어단어: q.영어단어, 정답뜻: q.뜻, options, correctIdx: options.indexOf(q.뜻), selectedIdx: null };
+        const correctIdx = options.indexOf(q.뜻);
+        return {
+          idx: idx + 1,
+          단어번호: q.단어번호,
+          영어단어: q.영어단어,
+          정답뜻: q.뜻,
+          options: options,
+          correctIdx: correctIdx,
+          selectedIdx: null
+        };
       });
 
-      const examState = { student: currentStudent, cat, sNum, eNum, qCount, isPractice: mode === "practice", startTime: Date.now(), questions };
+      const examState = {
+        student: currentStudent,
+        cat,
+        sNum,
+        eNum,
+        qCount,
+        isPractice: mode === "practice",
+        startTime: Date.now(),
+        questions
+      };
+
       localStorage.setItem("pqrs_active_exam_v2", JSON.stringify(examState));
       document.getElementById("examResultBox").classList.add("hidden");
       renderActiveExam(examState);
@@ -714,33 +1096,74 @@
       if (!saved) return;
       try {
         const examState = JSON.parse(saved);
-        if (examState && examState.student === currentStudent && Array.isArray(examState.questions)) renderActiveExam(examState);
-      } catch (e) { localStorage.removeItem("pqrs_active_exam_v2"); }
+        if (examState && examState.student === currentStudent && Array.isArray(examState.questions)) {
+          switchTab("exam");
+          renderActiveExam(examState);
+        }
+      } catch (e) {
+        localStorage.removeItem("pqrs_active_exam_v2");
+      }
     }
 
     function renderActiveExam(examState) {
       document.getElementById("examSetupBox").classList.add("hidden");
       document.getElementById("examPaperBox").classList.remove("hidden");
+
       const badge = document.getElementById("examHeaderBadge");
-      badge.textContent = examState.isPractice ? "🛠️ 연습 모드" : "🔥 실전 모드";
-      badge.className = "text-[11px] font-extrabold px-2 py-0.5 rounded text-white mr-1 " + (examState.isPractice ? "bg-blue-600" : "bg-rose-600");
+      if (examState.isPractice) {
+        badge.textContent = "🛠️ 연습 모드";
+        badge.className = "text-[11px] font-extrabold px-2 py-0.5 rounded bg-blue-600 text-white mr-1";
+      } else {
+        badge.textContent = "🔥 실전 모드";
+        badge.className = "text-[11px] font-extrabold px-2 py-0.5 rounded bg-rose-600 text-white mr-1";
+      }
       document.getElementById("examHeaderTitle").textContent = `${examState.cat} (${examState.sNum}~${examState.eNum}번)`;
 
       const listEl = document.getElementById("examQuestionsList");
       listEl.innerHTML = "";
+
       examState.questions.forEach((q, qIndex) => {
         const qCard = document.createElement("div");
         qCard.id = `qCard_${qIndex}`;
         qCard.className = "bg-white p-4 rounded-xl shadow-sm border-2 " + (q.selectedIdx !== null ? "border-blue-200" : "border-slate-200");
+
         let optsHtml = "";
         q.options.forEach((optText, optIndex) => {
           const isSelected = q.selectedIdx === optIndex;
-          optsHtml += `<button type="button" id="optBtn_${qIndex}_${optIndex}" onclick="selectAnswerOption(${qIndex}, ${optIndex})" class="w-full text-left flex items-center space-x-3 p-3 rounded-xl border transition ${isSelected ? 'border-blue-600 bg-blue-50 text-blue-950 font-bold ring-1 ring-blue-600' : 'border-slate-200 bg-white text-slate-800 hover:bg-slate-50'}"><span id="optCircle_${qIndex}_${optIndex}" class="w-6 h-6 rounded-full border text-xs font-extrabold flex items-center justify-center shrink-0 ${isSelected ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-100 text-slate-600 border-slate-300'}">${optIndex + 1}</span><span class="text-sm leading-snug break-keep">${escapeHtml(optText)}</span></button>`;
+          const btnStyle = isSelected
+            ? "border-blue-600 bg-blue-50 text-blue-950 font-bold ring-1 ring-blue-600"
+            : "border-slate-200 bg-white text-slate-800 hover:bg-slate-50";
+          const circleStyle = isSelected
+            ? "bg-blue-600 text-white border-blue-600"
+            : "bg-slate-100 text-slate-600 border-slate-300";
+
+          optsHtml += `
+            <button type="button" id="optBtn_${qIndex}_${optIndex}" onclick="selectAnswerOption(${qIndex}, ${optIndex})"
+              class="w-full text-left flex items-center space-x-3 p-3 rounded-xl border transition ${btnStyle}">
+              <span id="optCircle_${qIndex}_${optIndex}" class="w-6 h-6 rounded-full border text-xs font-extrabold flex items-center justify-center shrink-0 ${circleStyle}">
+                ${optIndex + 1}
+              </span>
+              <span class="text-sm leading-snug break-keep">${escapeHtml(optText)}</span>
+            </button>
+          `;
         });
-        qCard.innerHTML = `<div class="flex items-center justify-between mb-3"><p class="text-sm md:text-base font-extrabold text-slate-900"><span class="text-blue-800 mr-1">Q${q.idx}.</span> '${escapeHtml(q.영어단어)}'의 알맞은 뜻은?</p><span id="qStatus_${qIndex}" class="text-[11px] font-bold px-2 py-0.5 rounded ${q.selectedIdx !== null ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-500'}">${q.selectedIdx !== null ? `✓ ${q.selectedIdx + 1}번` : '미선택'}</span></div><div class="space-y-2">${optsHtml}</div>`;
+
+        qCard.innerHTML = `
+          <div class="flex items-center justify-between mb-3">
+            <p class="text-sm md:text-base font-extrabold text-slate-900">
+              <span class="text-blue-800 mr-1">Q${q.idx}.</span> '${escapeHtml(q.영어단어)}'의 알맞은 뜻은?
+            </p>
+            <span id="qStatus_${qIndex}" class="text-[11px] font-bold px-2 py-0.5 rounded ${q.selectedIdx !== null ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-500'}">
+              ${q.selectedIdx !== null ? `✓ ${q.selectedIdx + 1}번 선택됨` : '미선택'}
+            </span>
+          </div>
+          <div class="space-y-2">${optsHtml}</div>
+        `;
         listEl.appendChild(qCard);
       });
-      document.getElementById("examProgressCount").textContent = `[${examState.questions.filter(q => q.selectedIdx !== null).length}/${examState.questions.length} 완료]`;
+
+      updateExamProgressCount(examState);
+
       if (examTimerInterval) clearInterval(examTimerInterval);
       updateTimerDisplay(examState.startTime);
       examTimerInterval = setInterval(() => updateTimerDisplay(examState.startTime), 1000);
@@ -751,13 +1174,55 @@
       const saved = localStorage.getItem("pqrs_active_exam_v2");
       if (!saved) return;
       const examState = JSON.parse(saved);
+      if (!examState.questions[qIndex]) return;
+
       examState.questions[qIndex].selectedIdx = optIndex;
       localStorage.setItem("pqrs_active_exam_v2", JSON.stringify(examState));
-      renderActiveExam(examState);
+
+      for (let i = 0; i < 5; i++) {
+        const btn = document.getElementById(`optBtn_${qIndex}_${i}`);
+        const circle = document.getElementById(`optCircle_${qIndex}_${i}`);
+        if (!btn || !circle) continue;
+        if (i === optIndex) {
+          btn.className = "w-full text-left flex items-center space-x-3 p-3 rounded-xl border transition border-blue-600 bg-blue-50 text-blue-950 font-bold ring-1 ring-blue-600";
+          circle.className = "w-6 h-6 rounded-full border text-xs font-extrabold flex items-center justify-center shrink-0 bg-blue-600 text-white border-blue-600";
+        } else {
+          btn.className = "w-full text-left flex items-center space-x-3 p-3 rounded-xl border transition border-slate-200 bg-white text-slate-800 hover:bg-slate-50";
+          circle.className = "w-6 h-6 rounded-full border text-xs font-extrabold flex items-center justify-center shrink-0 bg-slate-100 text-slate-600 border-slate-300";
+        }
+      }
+
+      const card = document.getElementById(`qCard_${qIndex}`);
+      if (card) card.className = "bg-white p-4 rounded-xl shadow-sm border-2 border-blue-200";
+      const statusBadge = document.getElementById(`qStatus_${qIndex}`);
+      if (statusBadge) {
+        statusBadge.textContent = `✓ ${optIndex + 1}번 선택됨`;
+        statusBadge.className = "text-[11px] font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-800";
+      }
+
+      updateExamProgressCount(examState);
+    }
+
+    function updateExamProgressCount(examState) {
+      const total = examState.questions.length;
+      const answered = examState.questions.filter(q => q.selectedIdx !== null && q.selectedIdx !== undefined).length;
+      const el = document.getElementById("examProgressCount");
+      if (el) el.textContent = `[${answered}/${total} 완료]`;
+    }
+
+    function updateTimerDisplay(startTime) {
+      const elapsed = Math.floor((Date.now() - startTime) / 1000);
+      const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
+      const secs = String(elapsed % 60).padStart(2, '0');
+      const timerEl = document.getElementById("examTimerText");
+      timerEl.textContent = `${mins}:${secs} / 15:00`;
+      if (elapsed > 900) {
+        timerEl.className = "text-xs md:text-sm font-mono font-bold text-rose-400 animate-pulse";
+      }
     }
 
     function cancelExam() {
-      if (!confirm("시험을 취소할까요?")) return;
+      if (!confirm("현재 풀고 있는 시험을 취소하고 설정 화면으로 돌아갈까요?")) return;
       if (examTimerInterval) clearInterval(examTimerInterval);
       localStorage.removeItem("pqrs_active_exam_v2");
       document.getElementById("examPaperBox").classList.add("hidden");
@@ -769,32 +1234,55 @@
       const saved = localStorage.getItem("pqrs_active_exam_v2");
       if (!saved) return;
       const examState = JSON.parse(saved);
-      const unanswered = examState.questions.map((q, i) => q.selectedIdx === null ? i + 1 : null).filter(Boolean);
-      if (unanswered.length > 0) { alert(`🚨 풀지 않은 문제: ${unanswered.join(", ")}번`); return; }
+
+      const unanswered = [];
+      examState.questions.forEach((q, idx) => {
+        if (q.selectedIdx === null || q.selectedIdx === undefined) unanswered.push(idx);
+      });
+
+      if (unanswered.length > 0) {
+        const nums = unanswered.map(i => i + 1).join(", ");
+        alert(`🚨 아직 체크하지 않은 문제가 있습니다: ${nums}번 문항을 확인해 주세요!`);
+        const firstCard = document.getElementById(`qCard_${unanswered[0]}`);
+        if (firstCard) {
+          firstCard.className = "bg-white p-4 rounded-xl shadow-sm border-2 border-rose-500 ring-2 ring-rose-300";
+          firstCard.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+        return;
+      }
 
       isSubmittingExam = true;
       const submitBtn = document.getElementById("submitExamBtn");
       submitBtn.disabled = true;
-      submitBtn.textContent = "⏳ 채점 및 전송 중...";
+      submitBtn.textContent = "⏳ 안전하게 채점 및 성적 전송 중입니다... (잠시만 기다려주세요)";
 
       try {
         const examStudent = examState.student || currentStudent;
         const correctCount = examState.questions.filter(q => q.selectedIdx === q.correctIdx).length;
         const finalScore = Math.floor((correctCount / examState.questions.length) * 100);
-        const wrongList = examState.questions.filter(q => q.selectedIdx !== q.correctIdx);
-
-        await autoAddWrongWordsToMyVoca(wrongList);
 
         const stInfo = allStudents.find(s => s.이름 === examStudent) || {};
-        const passCutoff = 100 - (parseInt(stInfo.오답허용률, 10) || 10);
+        const missRate = parseInt(stInfo.오답허용률, 10) || 10;
+        const passCutoff = 100 - missRate;
+
         const earlyReqToday = getTodayEarlyMinutes(stInfo);
         const maxDailyRegularPoints = earlyReqToday > 0 ? 2 : 1;
+
         const elapsedSecs = Math.floor((Date.now() - examState.startTime) / 1000);
-        const mins = Math.floor(elapsedSecs / 60), secs = elapsedSecs % 60;
+        const mins = Math.floor(elapsedSecs / 60);
+        const secs = elapsedSecs % 60;
 
-        if (unsavedStudySeconds >= 20) { unsavedStudySeconds = 0; await recordStudyMinutesToServer(examStudent, 1); }
+        // 시험을 제출할 때 남은 초 단위 공부시간이 있으면 حداقل 1분으로 반올림하여 공부시간에 반영
+        if (unsavedStudySeconds >= 20) {
+          unsavedStudySeconds = 0;
+          await recordStudyMinutesToServer(examStudent, 1);
+        }
 
-        let status = elapsedSecs > 900 ? "미통과 (15분 시간초과)" : (finalScore < passCutoff ? `미통과 (기준 ${passCutoff}점)` : `통과 (기준 ${passCutoff}점)`);
+        let status = "";
+        if (elapsedSecs > 900) status = "미통과 (15분 시간초과)";
+        else if (finalScore < passCutoff) status = `미통과 (기준 ${passCutoff}점)`;
+        else status = `통과 (기준 ${passCutoff}점)`;
+
         const pureRange = `${examState.cat} ${examState.sNum}~${examState.eNum}번`;
         const todayStr = getKSTDateString();
         let pointAddedMsg = "";
@@ -804,47 +1292,113 @@
             db.from("vocab_tests").select("날짜, 이름, 점수, 결과, 비고").eq("이름", examStudent),
             db.from("points").select("날짜, 이름, 내역, 포인트증감").eq("이름", examStudent).eq("날짜", todayStr)
           ]);
+
           const freshTests = vocLatestRes.data || myVocabTests;
           const todayPointsList = ptTodayRes.data || [];
-          const sameRangeHistory = freshTests.filter(v => extractPureRange(v.비고) === pureRange).sort((a, b) => String(a.날짜).localeCompare(String(b.날짜)));
-          const lastAttempt = sameRangeHistory.length > 0 ? sameRangeHistory[sameRangeHistory.length - 1] : null;
-          const isRetake = lastAttempt ? (String(lastAttempt.결과 || "").includes("미통과") || String(lastAttempt.결과 || "").includes("미응시")) : false;
 
-          let pointToAdd = 0, pointReason = "";
+          const sameRangeHistory = freshTests
+            .filter(v => extractPureRange(v.비고) === pureRange)
+            .sort((a, b) => String(a.날짜).localeCompare(String(b.날짜)));
+
+          const recentPassedNow = sameRangeHistory.find(v => {
+            if (!String(v.결과 || "").startsWith("통과")) return false;
+            const diff = getDaysDiff(todayStr, v.날짜);
+            return diff >= 0 && diff < SAME_RANGE_COOLDOWN_DAYS;
+          });
+
+          if (recentPassedNow) {
+            alert(`🚨 [${pureRange}] 범위는 최근(${recentPassedNow.날짜})에 이미 통과 처리된 시험입니다! 중복 제출이 차단되었습니다.`);
+            if (examTimerInterval) clearInterval(examTimerInterval);
+            localStorage.removeItem("pqrs_active_exam_v2");
+            document.getElementById("examPaperBox").classList.add("hidden");
+            document.getElementById("examSetupBox").classList.remove("hidden");
+            await loadStudentPersonalData(examStudent);
+            return;
+          }
+
+          const lastAttempt = sameRangeHistory.length > 0 ? sameRangeHistory[sameRangeHistory.length - 1] : null;
+          const isRetake = lastAttempt
+            ? (String(lastAttempt.결과 || "").includes("미통과") || String(lastAttempt.결과 || "").includes("미응시"))
+            : false;
+
+          let pointToAdd = 0;
+          let pointReason = "";
+
           if (isRetake && status.startsWith("통과")) {
-            if (getDaysDiff(todayStr, lastAttempt.날짜) <= 1) { pointToAdd = 0.5; pointReason = `재시험/미응시 24h내 통과 (${pureRange})`; }
+            const diffDays = getDaysDiff(todayStr, lastAttempt.날짜);
+            if (diffDays <= 1) {
+              pointToAdd = 0.5;
+              pointReason = `재시험/미응시 24h내 통과 (${pureRange})`;
+            }
           } else if (!isRetake && status.startsWith("통과")) {
-            const todayRegularPointCount = todayPointsList.filter(p => String(p.내역 || "").includes("단어 본시험 통과")).length;
-            if (todayRegularPointCount < maxDailyRegularPoints) { pointToAdd = 1; pointReason = `단어 본시험 통과 (${pureRange})`; }
-            else pointAddedMsg = "ℹ️ 오늘 본시험 포인트 한도를 달성하여 성적만 기록되었습니다.";
+            const todayRegularPointCount = todayPointsList.filter(p =>
+              String(p.내역 || "").includes("단어 본시험 통과")
+            ).length;
+
+            if (todayRegularPointCount < maxDailyRegularPoints) {
+              pointToAdd = 1;
+              pointReason = `단어 본시험 통과 (${pureRange})`;
+            } else {
+              pointToAdd = 0;
+              const limitLabel = earlyReqToday > 0 ? "오늘 사전등원 요일 최대 2회" : "일반 등원일 1일 1회";
+              pointAddedMsg = `ℹ️ 시험 통과 기록은 정상 전송되었으나, 오늘 본시험 장학금 포인트 지급 한도(${limitLabel})를 이미 달성하여 추가 포인트는 지급되지 않았습니다.`;
+            }
           }
 
           const examTag = isRetake ? "[재시험]" : "[본시험]";
-          await safeInsert("vocab_tests", { 날짜: todayStr, 이름: examStudent, 점수: String(finalScore), 결과: status, 비고: `${examTag} ${pureRange} (${mins}분${secs}초)` });
+          const rangeStr = `${examTag} ${pureRange} (${mins}분${secs}초)`;
 
-          if (pointToAdd > 0 && !todayPointsList.some(p => String(p.내역 || "") === pointReason)) {
-            await safeInsert("points", { 날짜: todayStr, 이름: examStudent, 내역: pointReason, 포인트증감: String(pointToAdd) });
-            pointAddedMsg = `✨ 축하합니다! ${pointReason}로 장학금 +${pointToAdd} 포인트를 획득했습니다! (틀린 단어는 나만의 단어장에 자동 저장되었습니다!)`;
-          } else {
-            pointAddedMsg += " (틀린 단어는 나만의 단어장에 자동 저장되었습니다!)";
+          await safeInsert("vocab_tests", {
+            날짜: todayStr,
+            이름: examStudent,
+            점수: String(finalScore),
+            결과: status,
+            비고: rangeStr
+          });
+
+          if (pointToAdd > 0) {
+            const alreadySamePt = todayPointsList.some(p => String(p.내역 || "") === pointReason);
+            if (!alreadySamePt) {
+              await safeInsert("points", {
+                날짜: todayStr,
+                이름: examStudent,
+                내역: pointReason,
+                포인트증감: String(pointToAdd)
+              });
+              pointAddedMsg = `✨ 축하합니다! ${pointReason}로 장학금 +${pointToAdd} 포인트를 획득했습니다!`;
+            }
           }
 
           if (!isRetake) {
             const { data: attToday } = await db.from("attendance").select("*").eq("이름", examStudent).eq("날짜", todayStr);
-            if ((!attToday || attToday.length === 0) && earlyReqToday === 0) {
+            if (!attToday || attToday.length === 0) {
               const isMakeupToday = String(stInfo.보충일정 || "").includes(todayStr);
-              await safeInsert("attendance", { 날짜: todayStr, 이름: examStudent, 출결: isMakeupToday ? "보충" : "출석", 등원시간: "-", 사전등원달성: "해당없음", 비고: "본시험제출 자동출결" });
+              if (earlyReqToday === 0) {
+                await safeInsert("attendance", {
+                  날짜: todayStr,
+                  이름: examStudent,
+                  출결: isMakeupToday ? "보충" : "출석",
+                  등원시간: "-",
+                  사전등원달성: "해당없음",
+                  비고: "본시험제출 자동출결"
+                });
+              }
             }
           }
         }
 
         if (examTimerInterval) clearInterval(examTimerInterval);
         localStorage.removeItem("pqrs_active_exam_v2");
-        if (status.startsWith("통과")) confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
-        showExamResultScreen(examState, finalScore, status, mins, secs, pointAddedMsg, wrongList);
+
+        if (status.startsWith("통과")) {
+          confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+        }
+
+        showExamResultScreen(examState, finalScore, status, mins, secs, pointAddedMsg);
         await loadStudentPersonalData(examStudent);
+
       } catch (err) {
-        alert("제출 오류: " + err.message);
+        alert("제출 중 일시적인 네트워크 지연이 발생했습니다. 체크하신 답안은 그대로 보존되어 있으니 [최종 제출] 버튼을 한 번만 다시 눌러주세요! (" + err.message + ")");
       } finally {
         isSubmittingExam = false;
         submitBtn.disabled = false;
@@ -852,257 +1406,56 @@
       }
     }
 
-    // 주간과제 퀴즈 로직
-    function parseAttemptsFromMemo(memoStr) {
-      const m = String(memoStr || "").match(/시도:(\d+)\/3/);
-      return m ? (parseInt(m[1], 10) || 0) : 0;
-    }
-    function getCoreRewardByAttemptIndex(idx) {
-      if (idx === 0) return 1.0;
-      if (idx === 1) return 0.5;
-      if (idx === 2) return 0.25;
-      return 0;
-    }
+    function showExamResultScreen(examState, finalScore, status, mins, secs, pointAddedMsg) {
+      document.getElementById("examPaperBox").classList.add("hidden");
+      document.getElementById("examSetupBox").classList.remove("hidden");
 
-    function renderAssignedCoreList() {
-      const container = document.getElementById("myAssignedCoreContainer");
-      if (!container) return;
-      container.innerHTML = "";
-      const coreHws = myAssignments.filter(h => String(h.과제명 || "").startsWith("[CORE]"));
-      if (coreHws.length === 0) {
-        container.innerHTML = `<div class="text-center py-6 text-xs text-slate-500 bg-slate-50 rounded-xl border">현재 부여된 CORE 주간과제가 없습니다.</div>`;
-        return;
-      }
-      const todayStr = getKSTDateString();
-      coreHws.forEach((hw, idx) => {
-        const rawTitle = String(hw.과제명 || "").replace("[CORE]", "").trim();
-        const deadline = String(hw.날짜 || "").trim();
-        const isExpired = deadline && (todayStr > deadline) && hw.결과 === "진행중";
-        const attempts = parseAttemptsFromMemo(hw.선생님메모);
-        const memoInfo = String(hw.선생님메모 || "");
+      const resBox = document.getElementById("examResultBox");
+      resBox.classList.remove("hidden");
 
-        const rowDiv = document.createElement("div");
-        rowDiv.className = "flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-xl border " + (hw.결과 === "제출" ? "bg-emerald-50 border-emerald-200" : (isExpired ? "bg-rose-50 border-rose-200" : "bg-white shadow-sm"));
-        let statusHtml = "", btnHtml = "";
-
-        if (hw.결과 === "제출") {
-          statusHtml = `<span class="text-xs font-extrabold text-emerald-700">✅ 통과 완료 (${escapeHtml(memoInfo)})</span>`;
-          btnHtml = `<button onclick="openCoreQuizByAssignment(${idx}, true)" class="bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg">복습 풀기 (0P)</button>`;
-        } else if (hw.결과 === "미제출" || memoInfo.includes("실패")) {
-          statusHtml = `<span class="text-xs font-extrabold text-rose-700">❌ 최종 실패 (${escapeHtml(memoInfo)})</span>`;
-          btnHtml = `<button onclick="openCoreQuizByAssignment(${idx}, true)" class="bg-slate-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg">오답 복습 (0P)</button>`;
-        } else if (isExpired) {
-          statusHtml = `<span class="text-xs font-extrabold text-rose-700">⏰ 기한만료 미제출 (0P)</span>`;
-          btnHtml = `<button onclick="openCoreQuizByAssignment(${idx}, true)" class="bg-slate-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg">연습 풀기 (0P)</button>`;
-        } else {
-          const nextReward = getCoreRewardByAttemptIndex(attempts);
-          statusHtml = `<span class="text-xs font-bold text-indigo-900">마감: ~${escapeHtml(deadline)} | 남은 기회: ${'❤️'.repeat(3 - attempts)}${'🤍'.repeat(attempts)} (${attempts + 1}차 통과 시 +${nextReward}P)</span>`;
-          btnHtml = `<button onclick="openCoreQuizByAssignment(${idx}, false)" class="bg-blue-900 text-white text-xs font-extrabold px-3.5 py-2 rounded-lg shadow">🚀 ${attempts + 1}차 도전 (+${nextReward}P)</button>`;
-        }
-        rowDiv.innerHTML = `<div class="space-y-0.5"><p class="text-sm font-extrabold text-slate-900">📌 ${escapeHtml(rawTitle)}</p>${statusHtml}</div><div class="text-right">${btnHtml}</div>`;
-        container.appendChild(rowDiv);
-      });
-    }
-
-    function findPassageBankByTitle(rawTitle) {
-      if (coreBankMap[rawTitle]) return coreBankMap[rawTitle];
-      const stripped = rawTitle.replace(/^\d+\.\s*/, "").trim();
-      if (coreBankMap[stripped]) return coreBankMap[stripped];
-      const foundKey = Object.keys(coreBankMap).find(k => k.includes(stripped) || stripped.includes(k));
-      return foundKey ? coreBankMap[foundKey] : null;
-    }
-
-    function syncCoreBankFromWordbook() {
-      coreBankMap = {};
-      allWordbook.forEach(w => {
-        if (String(w.분류 || "").startsWith("[CORE문제은행]")) {
-          const pTitle = String(w.영어단어 || "").trim();
-          try {
-            const parsed = JSON.parse(String(w.예문 || "{}"));
-            if (pTitle && parsed && Array.isArray(parsed.tfPool)) coreBankMap[pTitle] = parsed;
-          } catch (e) {}
-        }
-      });
-      const freeSel = document.getElementById("freePracticeCoreSelect");
-      if (freeSel) {
-        freeSel.innerHTML = "";
-        Object.keys(coreBankMap).forEach(t => freeSel.add(new Option(t, t)));
-      }
-    }
-
-    function startFreePracticeCore() {
-      const selTitle = document.getElementById("freePracticeCoreSelect").value;
-      if (!selTitle) return;
-      launchCoreQuizSession({ passageTitle: selTitle, hwRow: null, isPracticeOnly: true, attemptIdx: 0 });
-    }
-
-    function openCoreQuizByAssignment(coreHwIdx, forcePractice) {
-      const coreHws = myAssignments.filter(h => String(h.과제명 || "").startsWith("[CORE]"));
-      const hwRow = coreHws[coreHwIdx];
-      if (!hwRow) return;
-      launchCoreQuizSession({ passageTitle: String(hwRow.과제명 || "").replace("[CORE]", "").trim(), hwRow, isPracticeOnly: forcePractice, attemptIdx: parseAttemptsFromMemo(hwRow.선생님메모) });
-    }
-
-    function launchCoreQuizSession({ passageTitle, hwRow, isPracticeOnly, attemptIdx }) {
-      const bank = findPassageBankByTitle(passageTitle);
-      if (!bank) { alert(`해당 지문(${passageTitle})의 문제은행 데이터가 없습니다.`); return; }
-
-      const tfSel = shuffleArray(bank.tfPool || []).slice(0, 5).map(q => ({ type: "TF", badge: "일치·불일치 O/X", badgeColor: "bg-indigo-100 text-indigo-800", eng: q.eng, kor: q.kor, options: ["O", "X"], ans: q.ans, exp: q.exp, userChoice: null }));
-      const sumSel = shuffleArray(bank.summaryPool || []).slice(0, 3).map(q => ({ type: "SUMMARY", badge: `요약문 어휘 (${q.label})`, badgeColor: "bg-amber-100 text-amber-900", eng: q.eng, kor: q.kor, options: shuffleArray(q.options), ans: q.ans, exp: q.exp, userChoice: null }));
-      const mainSel = shuffleArray(bank.mainIdeaPool || []).slice(0, 2).map(q => ({ type: "MAIN", badge: `핵심어 추론 (${q.label})`, badgeColor: "bg-emerald-100 text-emerald-900", eng: q.eng, kor: q.kor, options: shuffleArray(q.options), ans: q.ans, exp: q.exp, userChoice: null }));
-
-      const session = { student: currentStudent, passageTitle, hwRow, isPracticeOnly, attemptIdx, questions: [...tfSel, ...sumSel, ...mainSel] };
-      localStorage.setItem("pqrs_active_core_quiz_v1", JSON.stringify(session));
-      document.getElementById("coreResultBox").classList.add("hidden");
-      renderActiveCorePaper(session);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
-
-    function restoreOngoingCoreQuizIfAny() {
-      const saved = localStorage.getItem("pqrs_active_core_quiz_v1");
-      if (!saved) return;
-      try {
-        const session = JSON.parse(saved);
-        if (session && session.student === currentStudent) renderActiveCorePaper(session);
-      } catch (e) { localStorage.removeItem("pqrs_active_core_quiz_v1"); }
-    }
-
-    function renderActiveCorePaper(coreSession) {
-      document.getElementById("corePaperBox").classList.remove("hidden");
-      const badgeEl = document.getElementById("coreModeBadge");
-      if (coreSession.isPracticeOnly) {
-        badgeEl.textContent = "📖 자율 복습 (0P)";
-        badgeEl.className = "text-[11px] font-extrabold px-2 py-0.5 rounded bg-slate-600 text-white mr-1";
+      const wrongList = examState.questions.filter(q => q.selectedIdx !== q.correctIdx);
+      let wrongHtml = "";
+      if (wrongList.length === 0) {
+        wrongHtml = `<p class="text-sm font-bold text-emerald-700 text-center py-3">🎉 100점 만점입니다! 틀린 문제가 하나도 없습니다.</p>`;
       } else {
-        const reward = getCoreRewardByAttemptIndex(coreSession.attemptIdx);
-        badgeEl.textContent = `🔥 ${coreSession.attemptIdx + 1}차 도전 (+${reward}P)`;
-        badgeEl.className = "text-[11px] font-extrabold px-2 py-0.5 rounded bg-yellow-400 text-blue-950 mr-1";
+        wrongHtml = `
+          <div class="mt-3 pt-3 border-t border-slate-200">
+            <p class="text-xs font-extrabold text-rose-700 mb-2">📝 틀린 단어 오답 확인 (${wrongList.length}개)</p>
+            <div class="space-y-1.5 max-h-80 overflow-y-auto pr-1">
+              ${wrongList.map(w => {
+                const myChoiceText = w.options[w.selectedIdx] || "미선택";
+                return `
+                  <div class="text-xs bg-slate-50 p-2.5 rounded-lg border border-slate-200 flex justify-between items-center">
+                    <div><span class="font-extrabold text-slate-900 text-sm">${escapeHtml(w.영어단어)}</span> <span class="text-slate-400">(#${w.단어번호})</span></div>
+                    <div class="text-right">
+                      <span class="line-through text-rose-500 mr-2">${escapeHtml(myChoiceText)}</span>
+                      <span class="font-bold text-blue-900">👉 ${escapeHtml(w.정답뜻)}</span>
+                    </div>
+                  </div>
+                `;
+              }).join("")}
+            </div>
+          </div>
+        `;
       }
-      document.getElementById("corePaperTitle").textContent = coreSession.passageTitle;
 
-      const container = document.getElementById("coreQuestionsContainer");
-      container.innerHTML = "";
-      coreSession.questions.forEach((q, idx) => {
-        const card = document.createElement("div");
-        card.id = `coreQCard_${idx}`;
-        card.className = "bg-white rounded-xl p-4 shadow-sm border-2 " + (q.userChoice ? "border-blue-300" : "border-slate-200") + " space-y-2.5";
-        let optsHtml = "";
-        if (q.type === "TF") {
-          optsHtml = `<div class="grid grid-cols-2 gap-2 pt-1"><button type="button" onclick="selectCoreAnswer(${idx}, 'O')" class="py-3 px-3 rounded-xl border-2 font-extrabold text-xs md:text-sm ${q.userChoice==='O'?'border-blue-600 bg-blue-50 text-blue-900 ring-1 ring-blue-600':'border-slate-200 text-slate-700'}">⭕ O (일치)</button><button type="button" onclick="selectCoreAnswer(${idx}, 'X')" class="py-3 px-3 rounded-xl border-2 font-extrabold text-xs md:text-sm ${q.userChoice==='X'?'border-rose-600 bg-rose-50 text-rose-900 ring-1 ring-rose-600':'border-slate-200 text-slate-700'}">❌ X (불일치)</button></div>`;
-        } else {
-          optsHtml = `<div class="grid grid-cols-2 md:grid-cols-4 gap-2 pt-1">` + q.options.map((opt, oI) => `<button type="button" onclick="selectCoreAnswer(${idx}, \`${escapeHtml(opt).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}\`)" class="py-2.5 px-3 rounded-xl border-2 font-extrabold text-xs md:text-sm ${q.userChoice===opt?'border-blue-600 bg-blue-50 text-blue-950 ring-1 ring-blue-600':'border-slate-200 text-slate-700'}">${oI+1}. ${escapeHtml(opt)}</button>`).join("") + `</div>`;
-        }
-        card.innerHTML = `<div class="flex items-center justify-between"><span class="text-xs font-extrabold px-2.5 py-0.5 rounded-full ${q.badgeColor}">Q${idx+1}. ${escapeHtml(q.badge)}</span><span class="text-[11px] font-bold ${q.userChoice?'text-blue-700':'text-slate-400'}">${q.userChoice?`✓ '${q.userChoice}' 선택됨`:'미선택'}</span></div><p class="text-sm md:text-base font-bold text-slate-900 leading-relaxed">${q.eng}</p><div class="bg-slate-50 border-l-4 border-blue-800 px-3 py-2 rounded-r-lg text-xs text-slate-700"><span class="font-extrabold text-blue-900 mr-1">🇰🇷 해석 체크:</span> ${q.kor}</div>${optsHtml}`;
-        container.appendChild(card);
-      });
-    }
+      const isPass = status.startsWith("통과");
+      const msgColorClass = pointAddedMsg.startsWith("✨")
+        ? "text-emerald-700 bg-emerald-50 border border-emerald-200"
+        : "text-slate-700 bg-slate-100 border border-slate-300";
 
-    function selectCoreAnswer(qIdx, val) {
-      markUserInteraction();
-      const saved = localStorage.getItem("pqrs_active_core_quiz_v1");
-      if (!saved) return;
-      const session = JSON.parse(saved);
-      session.questions[qIdx].userChoice = val;
-      localStorage.setItem("pqrs_active_core_quiz_v1", JSON.stringify(session));
-      renderActiveCorePaper(session);
-    }
-
-    function closeCorePaper() {
-      localStorage.removeItem("pqrs_active_core_quiz_v1");
-      document.getElementById("corePaperBox").classList.add("hidden");
-    }
-
-    async function submitCoreQuiz() {
-      if (isSubmittingCore) return;
-      const saved = localStorage.getItem("pqrs_active_core_quiz_v1");
-      if (!saved) return;
-      const coreSession = JSON.parse(saved);
-      const unanswered = coreSession.questions.map((q, i) => !q.userChoice ? i + 1 : null).filter(Boolean);
-      if (unanswered.length > 0) { alert(`🚨 풀지 않은 문항: ${unanswered.join(", ")}번`); return; }
-
-      isSubmittingCore = true;
-      const btn = document.getElementById("submitCoreQuizBtn");
-      btn.disabled = true;
-      btn.textContent = "⏳ 채점 중...";
-
-      try {
-        let correctCnt = 0;
-        const wrongList = [];
-        coreSession.questions.forEach((q, idx) => {
-          if (q.userChoice === q.ans) correctCnt++;
-          else wrongList.push({ num: idx + 1, ...q });
-        });
-
-        const score = Math.round((correctCnt / coreSession.questions.length) * 100);
-        const isPass = score >= 90;
-        const todayStr = getKSTDateString();
-
-        if (unsavedStudySeconds >= 20) { unsavedStudySeconds = 0; await recordStudyMinutesToServer(currentStudent, 1); }
-
-        let headerHtml = "", nextActionHtml = "";
-        if (coreSession.isPracticeOnly || !coreSession.hwRow) {
-          headerHtml = `<div class="text-center space-y-1"><span class="bg-slate-200 text-slate-800 text-xs font-black px-3 py-1 rounded-full">📖 자율 복습 채점 완료</span><h3 class="text-3xl font-black ${isPass?'text-blue-900':'text-rose-600'} pt-1">${score}점 <span class="text-lg">(${correctCnt}/10)</span></h3></div>`;
-        } else {
-          const { data: freshHwList } = await db.from("assignments").select("*").eq("이름", currentStudent).eq("과제명", coreSession.hwRow.과제명);
-          const freshHw = (freshHwList && freshHwList.length > 0) ? freshHwList[freshHwList.length - 1] : coreSession.hwRow;
-          const curAttempts = parseAttemptsFromMemo(freshHw.선생님메모);
-          const tryNumber = curAttempts + 1;
-          const rewardPt = getCoreRewardByAttemptIndex(curAttempts);
-
-          if (freshHw.결과 === "제출") {
-            alert("이미 통과 처리된 과제입니다!");
-          } else if (isPass) {
-            let qUp = db.from("assignments").update({ 결과: "제출", 선생님메모: `${tryNumber}차통과(${score}점/+${rewardPt}P)` });
-            if (freshHw.id !== undefined && freshHw.id !== null) qUp = qUp.eq("id", freshHw.id);
-            else qUp = qUp.eq("이름", currentStudent).eq("과제명", freshHw.과제명);
-            await qUp;
-
-            if (rewardPt > 0) {
-              const ptDesc = `CORE과제 ${tryNumber}차통과 (${coreSession.passageTitle})`;
-              await safeInsert("points", { 날짜: todayStr, 이름: currentStudent, 내역: ptDesc, 포인트증감: String(rewardPt) });
-              allPoints.push({ 날짜: todayStr, 이름: currentStudent, 내역: ptDesc, 포인트증감: String(rewardPt) });
-            }
-            confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
-            headerHtml = `<div class="text-center space-y-1"><span class="bg-emerald-100 text-emerald-800 text-xs font-black px-3 py-1 rounded-full">🎉 ${tryNumber}차 만에 과제 통과!</span><h3 class="text-3xl font-black text-blue-900 pt-1">${score}점 <span class="text-lg">(${correctCnt}/10)</span></h3><p class="text-xs font-extrabold text-emerald-800 bg-emerald-50 py-2 px-3 rounded-xl mt-1">✨ 장학금 포인트 +${rewardPt} P 적립 완료!</p></div>`;
-          } else {
-            if (tryNumber >= 3) {
-              let qUp = db.from("assignments").update({ 결과: "미제출", 선생님메모: `실패(3회연속미통과/${score}점/0P)` });
-              if (freshHw.id !== undefined && freshHw.id !== null) qUp = qUp.eq("id", freshHw.id);
-              else qUp = qUp.eq("이름", currentStudent).eq("과제명", freshHw.과제명);
-              await qUp;
-              headerHtml = `<div class="text-center space-y-1"><span class="bg-rose-100 text-rose-800 text-xs font-black px-3 py-1 rounded-full">❌ 3회 미통과 - 과제 실패 확정</span><h3 class="text-3xl font-black text-rose-600 pt-1">${score}점 <span class="text-lg">(${correctCnt}/10)</span></h3><p class="text-xs font-bold text-rose-800 bg-rose-50 py-2 px-3 rounded-xl mt-1">🚨 3번의 기회를 모두 소진하여 '실패(0P)'로 기록되었습니다.</p></div>`;
-            } else {
-              let qUp = db.from("assignments").update({ 결과: "진행중", 선생님메모: `시도:${tryNumber}/3(최근${score}점)` });
-              if (freshHw.id !== undefined && freshHw.id !== null) qUp = qUp.eq("id", freshHw.id);
-              else qUp = qUp.eq("이름", currentStudent).eq("과제명", freshHw.과제명);
-              await qUp;
-              const nextReward = getCoreRewardByAttemptIndex(tryNumber);
-              headerHtml = `<div class="text-center space-y-1"><span class="bg-amber-100 text-amber-900 text-xs font-black px-3 py-1 rounded-full">⚠️ ${tryNumber}차 미통과 (남은 기회 ${3 - tryNumber}회)</span><h3 class="text-3xl font-black text-rose-600 pt-1">${score}점 <span class="text-lg">(${correctCnt}/10)</span></h3><p class="text-xs font-bold text-slate-700 mt-1">다른 문제 조합으로 ${tryNumber + 1}차 재시험(통과 시 +${nextReward}P)에 도전하세요!</p></div>`;
-              nextActionHtml = `<button onclick="retakeCoreQuizNow(\`${escapeHtml(coreSession.passageTitle).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}\`, ${tryNumber})" class="w-full bg-rose-600 text-white font-black py-3.5 rounded-xl text-sm shadow">🔄 ${tryNumber + 1}차 재시험 바로 도전하기 (+${nextReward} P)</button>`;
-            }
-          }
-        }
-
-        localStorage.removeItem("pqrs_active_core_quiz_v1");
-        document.getElementById("corePaperBox").classList.add("hidden");
-        const resBox = document.getElementById("coreResultBox");
-        resBox.classList.remove("hidden");
-        resBox.innerHTML = headerHtml + (wrongList.length === 0 ? `<p class="text-center text-sm font-extrabold text-emerald-700 py-2">👏 만점입니다!</p>` : `<div class="border-t pt-3 space-y-2"><p class="text-xs font-extrabold text-rose-700">📝 틀린 문항 오답 확인</p><div class="space-y-2 max-h-96 overflow-y-auto">${wrongList.map(w => `<div class="bg-slate-50 border rounded-xl p-3 text-xs space-y-1"><div class="flex justify-between"><b>Q${w.num}. [${escapeHtml(w.badge)}]</b><span><span class="line-through text-rose-500 mr-1.5">내 답: ${escapeHtml(w.userChoice)}</span><b class="text-blue-900">정답: ${escapeHtml(w.ans)}</b></span></div><p class="font-semibold">${w.eng}</p><p class="text-indigo-800 font-bold">💡 해설: ${escapeHtml(w.exp)}</p></div>`).join("")}</div></div>`) + nextActionHtml;
-        await loadStudentPersonalData(currentStudent);
-        renderRanking();
-        resBox.scrollIntoView({ behavior: "smooth", block: "start" });
-      } catch (err) {
-        alert("제출 오류: " + err.message);
-      } finally {
-        isSubmittingCore = false;
-        btn.disabled = false;
-        btn.textContent = "✅ 답안 제출 및 채점하기";
-      }
-    }
-
-    function retakeCoreQuizNow(passageTitle, newAttemptIdx) {
-      const hwRow = myAssignments.find(h => String(h.과제명 || "").replace("[CORE]", "").trim() === passageTitle);
-      launchCoreQuizSession({ passageTitle, hwRow: hwRow || null, isPracticeOnly: false, attemptIdx: newAttemptIdx });
+      resBox.innerHTML = `
+        <div class="text-center space-y-1">
+          <span class="inline-block px-3 py-1 rounded-full text-xs font-extrabold ${isPass ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">
+            ${examState.isPractice ? '🛠️ 연습 모드 채점 완료 (공부시간 자동 반영)' : '🔥 실전 모드 성적 전송 완료!'}
+          </span>
+          <h3 class="text-3xl font-black ${isPass ? 'text-blue-900' : 'text-rose-600'} pt-1">${finalScore}점 <span class="text-lg">(${escapeHtml(status)})</span></h3>
+          <p class="text-xs text-slate-500">응시자: <b>${escapeHtml(examState.student)}</b> | 소요 시간: ${mins}분 ${secs}초</p>
+          ${pointAddedMsg ? `<p class="text-xs font-bold ${msgColorClass} py-2.5 px-3 rounded-lg mt-2">${escapeHtml(pointAddedMsg)}</p>` : ''}
+        </div>
+        ${wrongHtml}
+      `;
+      resBox.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
     window.addEventListener("DOMContentLoaded", initApp);
