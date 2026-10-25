@@ -299,7 +299,11 @@
 
     let allStudents = [];
     let allWordbook = [];
-    let allPoints = [];
+    // [속도 개선] 전체 포인트 기록 대신 '학생별 합계'만 받아옵니다.
+    let pointsSummary = {};   // { 이름: { total: 숫자, mins: 숫자, days: 숫자 } }
+    let giftRows = [];        // 시크릿선물 기록
+    let payoutRows = [];      // 장학금 지급 기록
+    let myTotalStudyMins = 0;
     let myVocabTests = [];
     let myRetakes = [];
 
@@ -384,9 +388,12 @@
       isSavingStudyTime = true;
       try {
         const todayStr = getKSTDateString();
-        const { data: rows } = await db.from("points").select("*").eq("날짜", todayStr).eq("이름", stName);
+        const { data: rows, error: selErr } = await db.from("points").select("*").eq("날짜", todayStr).eq("이름", stName);
+        if (selErr) throw selErr;
         const studyRow = (rows || []).find(r => String(r.내역 || "").startsWith("[공부시간]"));
 
+        let actuallyAdded = 0;
+        let isNewDay = false;
         if (studyRow) {
           const prevMins = parseStudyMinutesFromDesc(studyRow.내역);
           if (prevMins < MAX_DAILY_STUDY_MINS) {
@@ -397,7 +404,9 @@
             } else {
               q = q.eq("날짜", todayStr).eq("이름", stName).eq("내역", studyRow.내역);
             }
-            await q;
+            const { error: upErr } = await q;
+            if (upErr) throw upErr;
+            actuallyAdded = newMins - prevMins;
           }
         } else {
           await safeInsert("points", {
@@ -406,19 +415,21 @@
             내역: `[공부시간] ${addMins}분`,
             포인트증감: "0"
           });
+          actuallyAdded = addMins;
+          isNewDay = true;
         }
 
-        // 로컬 데이터에도 즉시 반영하여 화면 숫자 갱신
-        const localRow = allPoints.find(p => p.날짜 === todayStr && p.이름 === stName && String(p.내역 || "").startsWith("[공부시간]"));
-        if (localRow) {
-          const pm = parseStudyMinutesFromDesc(localRow.내역);
-          localRow.내역 = `[공부시간] ${Math.min(MAX_DAILY_STUDY_MINS, pm + addMins)}분`;
-        } else {
-          allPoints.push({ 날짜: todayStr, 이름: stName, 내역: `[공부시간] ${addMins}분`, 포인트증감: "0" });
+        // 화면 숫자 즉시 갱신 (서버 전체를 다시 받지 않음)
+        if (actuallyAdded > 0) {
+          if (!pointsSummary[stName]) pointsSummary[stName] = { total: 0, mins: 0, days: 0 };
+          pointsSummary[stName].mins += actuallyAdded;
+          if (isNewDay) pointsSummary[stName].days += 1;
+          if (stName === currentStudent) myTotalStudyMins += actuallyAdded;
+          updateMyStudyTimeCard(stName);
+          renderRanking();
         }
-        updateMyStudyTimeCard(stName);
-        renderRanking();
       } catch (e) {
+        console.error("공부시간 저장 실패:", e);
       } finally {
         isSavingStudyTime = false;
       }
@@ -432,10 +443,8 @@
     }
 
     function updateMyStudyTimeCard(stName) {
-      const myRows = allPoints.filter(p => p.이름 === stName && String(p.내역 || "").startsWith("[공부시간]"));
-      const totalMins = myRows.reduce((acc, r) => acc + parseStudyMinutesFromDesc(r.내역), 0);
       const el = document.getElementById("myStudyTimeText");
-      if (el) el.textContent = formatMinutesPretty(totalMins);
+      if (el) el.textContent = formatMinutesPretty(myTotalStudyMins);
     }
 
     function formatMinutesPretty(mins) {
@@ -583,7 +592,7 @@
         } catch (e) {}
       }
       const wbData = await fetchAllRows("wordbook", "*");
-            const formatted = (wbData || []).filter(w => !String(w.분류 || "").startsWith("[CORE")).map(w => ({
+      const formatted = (wbData || []).filter(w => !String(w.분류 || "").startsWith("[CORE")).map(w => ({
         ...w,
         단어번호: parseInt(w.단어번호, 10) || 0,
         영어단어: String(w.영어단어 ?? "").trim(),
@@ -606,6 +615,55 @@
       }
     }
 
+    function toNum(v) {
+      const n = parseFloat(v);
+      return isNaN(n) ? 0 : n;
+    }
+
+    function summarizePointRows(rows) {
+      const map = {};
+      const daySets = {};
+      (rows || []).forEach(p => {
+        const nm = p.이름;
+        if (!nm) return;
+        if (!map[nm]) { map[nm] = { total: 0, mins: 0, days: 0 }; daySets[nm] = new Set(); }
+        map[nm].total += toNum(p.포인트증감);
+        const mins = parseStudyMinutesFromDesc(p.내역);
+        if (mins > 0) {
+          map[nm].mins += mins;
+          if (p.날짜) daySets[nm].add(p.날짜);
+        }
+      });
+      Object.keys(map).forEach(nm => { map[nm].days = daySets[nm].size; });
+      return map;
+    }
+
+    // 랭킹용 데이터: Supabase의 points_summary(합계 뷰)를 먼저 사용하고,
+    // 아직 뷰가 없으면 예전 방식(전체 기록 다운로드)으로 자동 대체합니다.
+    async function loadRankingData() {
+      const [sumRes, giftRes, payRes] = await Promise.all([
+        db.from("points_summary").select("*"),
+        db.from("points").select("날짜, 이름, 내역, 포인트증감").like("내역", "[시크릿선물]%").order("날짜", { ascending: false }).limit(30),
+        db.from("points").select("날짜, 이름, 내역, 포인트증감").like("내역", "장학금%")
+      ]);
+
+      if (!sumRes.error && Array.isArray(sumRes.data)) {
+        const map = {};
+        sumRes.data.forEach(r => {
+          map[r.이름] = { total: toNum(r.total_points), mins: toNum(r.study_mins), days: toNum(r.study_days) };
+        });
+        pointsSummary = map;
+        giftRows = giftRes.error ? [] : (giftRes.data || []);
+        payoutRows = payRes.error ? [] : (payRes.data || []).filter(p => toNum(p.포인트증감) <= -50);
+      } else {
+        console.warn("points_summary 뷰를 찾지 못해 전체 기록 방식으로 불러옵니다.", sumRes.error);
+        const all = await fetchAllRows("points", "날짜, 이름, 내역, 포인트증감");
+        pointsSummary = summarizePointRows(all);
+        giftRows = all.filter(p => String(p.내역 || "").startsWith("[시크릿선물]")).reverse().slice(0, 30);
+        payoutRows = all.filter(p => toNum(p.포인트증감) <= -50);
+      }
+    }
+
     async function safeInsert(tableName, rowObj, retries = 4) {
       for (let i = 0; i < retries; i++) {
         const { error } = await db.from(tableName).insert(rowObj);
@@ -622,14 +680,13 @@
       }
 
       try {
-        const [stData, ptData, wbData] = await Promise.all([
+        const [stData, , wbData] = await Promise.all([
           fetchAllRows("students", "*"),
-          fetchAllRows("points", "날짜, 이름, 내역, 포인트증감"),
+          loadRankingData(),
           loadWordbookSmart(false)
         ]);
 
         allStudents = stData || [];
-        allPoints = ptData || [];
         allWordbook = wbData || [];
 
         const activeList = allStudents.filter(s => s.상태 === "재원").map(s => s.이름).sort();
@@ -740,6 +797,7 @@
       const totalStudyMins = myPtData
         .filter(r => String(r.내역 || "").startsWith("[공부시간]"))
         .reduce((acc, r) => acc + parseStudyMinutesFromDesc(r.내역), 0);
+      myTotalStudyMins = totalStudyMins;
       document.getElementById("myStudyTimeText").textContent = formatMinutesPretty(totalStudyMins);
 
       const attData = attRes.data || [];
@@ -872,12 +930,11 @@
 
     function renderRanking() {
       // 1) 시크릿 선물 당첨자 명예의 전당 렌더링
-      const giftRows = allPoints.filter(p => String(p.내역 || "").startsWith("[시크릿선물]"));
       const giftBox = document.getElementById("secretGiftHonorBox");
       const giftListEl = document.getElementById("secretGiftList");
       if (giftRows.length > 0) {
         giftBox.classList.remove("hidden");
-        const recentGifts = [...giftRows].reverse().slice(0, 8);
+        const recentGifts = giftRows.slice(0, 8);
         giftListEl.innerHTML = recentGifts.map(g => {
           const giftName = String(g.내역 || "").replace("[시크릿선물]", "").trim();
           return `
@@ -892,7 +949,7 @@
       }
 
       // 2) 50P 장학금 수령 명예의 전당
-      const payouts = allPoints.filter(p => (parseFloat(p.포인트증감) || 0) <= -50);
+      const payouts = payoutRows;
       if (payouts.length > 0) {
         const honorNames = [...new Set(payouts.map(p => maskName(p.이름)))];
         document.getElementById("honorNames").textContent = honorNames.join(" / ") + " 학생이 50P를 달성하여 장학금을 수령했습니다!";
@@ -902,25 +959,12 @@
       const validStudents = allStudents.filter(s => s.상태 === "재원" || s.상태 === "휴원");
 
       // 3) 열공 단어왕 (순수 공부시간 분) 집계
-      const timeMap = {};
-      const daysMap = {};
-      allPoints.forEach(p => {
-        const desc = String(p.내역 || "");
-        if (desc.startsWith("[공부시간]")) {
-          const mins = parseStudyMinutesFromDesc(desc);
-          if (mins > 0) {
-            timeMap[p.이름] = (timeMap[p.이름] || 0) + mins;
-            if (!daysMap[p.이름]) daysMap[p.이름] = new Set();
-            if (p.날짜) daysMap[p.이름].add(p.날짜);
-          }
-        }
-      });
 
       const rankedTime = validStudents.map(s => ({
         학생명: maskName(s.이름),
         학교학년: `${s.학교 || ""} ${String(s.학년 || "").replace(/고|학년/g, "").trim()}학년`,
-        학습일수: daysMap[s.이름] ? daysMap[s.이름].size : 0,
-        공부시간분: timeMap[s.이름] || 0
+        학습일수: pointsSummary[s.이름] ? pointsSummary[s.이름].days : 0,
+        공부시간분: pointsSummary[s.이름] ? pointsSummary[s.이름].mins : 0
       })).sort((a, b) => (b.공부시간분 - a.공부시간분) || (b.학습일수 - a.학습일수));
 
       const timeTbody = document.getElementById("studyTimeRankingBody");
@@ -940,17 +984,12 @@
       });
 
       // 4) 장학금 포인트 랭킹 집계
-      const ptMap = {};
-      allPoints.forEach(p => {
-        const val = parseFloat(p.포인트증감) || 0;
-        ptMap[p.이름] = (ptMap[p.이름] || 0) + val;
-      });
 
       const rankedPt = validStudents.map(s => ({
         학생명: maskName(s.이름),
         학교: s.학교 || "",
         학년: String(s.학년 || "").replace(/고|학년/g, "").trim() + "학년",
-        포인트: ptMap[s.이름] || 0
+        포인트: pointsSummary[s.이름] ? pointsSummary[s.이름].total : 0
       })).sort((a, b) => b.포인트 - a.포인트);
 
       const tbody = document.getElementById("rankingTableBody");
@@ -1272,7 +1311,7 @@
         const mins = Math.floor(elapsedSecs / 60);
         const secs = elapsedSecs % 60;
 
-        // 시험을 제출할 때 남은 초 단위 공부시간이 있으면 حداقل 1분으로 반올림하여 공부시간에 반영
+        // 시험을 제출할 때 남은 초 단위 공부시간이 있으면 최소 1분으로 반올림하여 공부시간에 반영
         if (unsavedStudySeconds >= 20) {
           unsavedStudySeconds = 0;
           await recordStudyMinutesToServer(examStudent, 1);
