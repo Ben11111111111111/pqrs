@@ -702,7 +702,7 @@
 
       try {
         const [stData, , wbData] = await Promise.all([
-          fetchAllRows("students", "*"),
+          fetchAllRows("students", '이름, 학교, 학년, 상태, 오답허용률, 등원일정, "사전등원(분)", 보충일정'),
           loadRankingData(),
           loadWordbookSmart(false)
         ]);
