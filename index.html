@@ -293,8 +293,8 @@
     const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     const SAME_RANGE_COOLDOWN_DAYS = 7;
-    const WORDBOOK_CACHE_KEY = "pqrs_wb_cache_v1";
-    const WORDBOOK_CACHE_TIME_KEY = "pqrs_wb_cache_time_v1";
+    const WORDBOOK_CACHE_KEY = "pqrs_wb_cache_v2";
+    const WORDBOOK_CACHE_TIME_KEY = "pqrs_wb_cache_time_v2";
     const WORDBOOK_CACHE_TTL_MS = 30 * 60 * 1000;
 
     let allStudents = [];
@@ -583,7 +583,7 @@
         } catch (e) {}
       }
       const wbData = await fetchAllRows("wordbook", "*");
-      const formatted = (wbData || []).map(w => ({
+            const formatted = (wbData || []).filter(w => !String(w.분류 || "").startsWith("[CORE")).map(w => ({
         ...w,
         단어번호: parseInt(w.단어번호, 10) || 0,
         영어단어: String(w.영어단어 ?? "").trim(),
