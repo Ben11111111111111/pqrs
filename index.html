@@ -205,6 +205,8 @@
           </div>
         </div>
         <button onclick="renderFlashcards()" class="mt-3 w-full bg-blue-900 hover:bg-blue-800 text-white font-bold py-2.5 rounded-lg text-sm transition">✨ 암기 시작! (공부시간 자동 측정)</button>
+        <button id="myVocaBtn" onclick="renderMyVocaCards()" class="mt-2 w-full bg-amber-400 hover:bg-amber-500 text-slate-900 font-extrabold py-2.5 rounded-lg text-sm transition">⭐ 나만의 단어장 (0개)</button>
+        <p class="text-[11px] text-slate-500 mt-1.5 text-center">카드의 ☆ 담기를 누르거나, 단어시험에서 틀린 단어는 자동으로 여기에 저장돼요.</p>
       </div>
 
       <p id="flashGuide" class="hidden text-xs text-center text-blue-800 bg-blue-50 py-2 rounded-lg font-medium">💡 카드를 터치하며 공부하면 1분마다 나의 누적 공부시간이 자동으로 기록됩니다!</p>
@@ -793,6 +795,7 @@
     }
 
     async function loadStudentPersonalData(stName) {
+      if (myVocaOwner !== stName) loadMyVoca(stName);
       document.getElementById("studentDashboard").classList.remove("hidden");
       const stInfo = allStudents.find(s => s.이름 === stName) || {};
       const myGradeRaw = String(stInfo.학년 || "");
@@ -1048,8 +1051,12 @@
         return;
       }
 
-      document.getElementById("flashGuide").classList.remove("hidden");
-      list.forEach(w => {
+      flashList = list;
+      const guide = document.getElementById("flashGuide");
+      guide.textContent = "💡 카드를 터치하면 뜻이 보여요. 모르는 단어는 ☆ 담기를 눌러 나만의 단어장에 넣으세요!";
+      guide.classList.remove("hidden");
+      list.forEach((w, wi) => {
+        const vk = vocaKey(w.영어단어);
         const card = document.createElement("div");
         card.className = "flip-card";
         card.onclick = () => {
@@ -1059,6 +1066,7 @@
         card.innerHTML = `
           <div class="flip-card-inner">
             <div class="flip-card-front">
+              <button type="button" data-voca-key="${escapeHtml(vk)}" onclick="event.stopPropagation(); toggleFlashVoca(${wi});" class="${starClass(!!myVoca[vk])}">${myVoca[vk] ? "★ 담음" : "☆ 담기"}</button>
               <span class="text-[11px] text-blue-200 mb-0.5">#${w.단어번호}</span>
               <h3 class="text-xl font-extrabold tracking-wide">${escapeHtml(w.영어단어)}</h3>
               <p class="text-xs text-slate-300 mt-1">${escapeHtml(w.발음기호)}</p>
@@ -1072,6 +1080,161 @@
         `;
         container.appendChild(card);
       });
+    }
+
+    // =====================================================
+    // ⭐ 나만의 단어장 (student_memos 테이블에 [MYVOCA_DATA] 로 저장)
+    // =====================================================
+    let myVoca = {};
+    let myVocaOwner = "";
+    let myVocaRowExists = false;
+    let myVocaRowId = null;
+    let myVocaSaving = Promise.resolve();
+    let flashList = [];
+
+    function vocaKey(eng) {
+      return String(eng || "").trim().toLowerCase();
+    }
+
+    function starClass(on) {
+      return "absolute top-2 right-2 text-[11px] font-extrabold px-2 py-1 rounded-full shadow " +
+        (on ? "bg-amber-400 text-slate-900" : "bg-white/20 text-white hover:bg-white/30");
+    }
+
+    async function loadMyVoca(stName) {
+      myVoca = {};
+      myVocaOwner = stName;
+      myVocaRowExists = false;
+      myVocaRowId = null;
+      updateMyVocaButton();
+      const { data, error } = await db.from("student_memos").select("*").eq("이름", stName).like("메모", "[MYVOCA_DATA]%");
+      if (error) { console.error("나만의 단어장 불러오기 실패:", error); return; }
+      if (myVocaOwner !== stName) return;
+      const rows = data || [];
+      if (rows.length) {
+        const r = rows[rows.length - 1];
+        myVocaRowExists = true;
+        myVocaRowId = (r.id !== undefined && r.id !== null) ? r.id : null;
+        try {
+          const obj = JSON.parse(String(r.메모 || "").replace("[MYVOCA_DATA]", "").trim() || "{}");
+          if (obj && typeof obj === "object") myVoca = obj;
+        } catch (e) {}
+      }
+      updateMyVocaButton();
+    }
+
+    function saveMyVoca() {
+      const stName = myVocaOwner;
+      if (!stName) return myVocaSaving;
+      const payload = "[MYVOCA_DATA]" + JSON.stringify(myVoca);
+      myVocaSaving = myVocaSaving.then(async () => {
+        if (myVocaOwner !== stName) return;
+        try {
+          if (myVocaRowExists) {
+            let q = db.from("student_memos").update({ 메모: payload, 날짜: getKSTDateString() });
+            q = (myVocaRowId !== null) ? q.eq("id", myVocaRowId) : q.eq("이름", stName).like("메모", "[MYVOCA_DATA]%");
+            const { error } = await q;
+            if (error) throw error;
+          } else {
+            await safeInsert("student_memos", { 날짜: getKSTDateString(), 이름: stName, 메모: payload });
+            myVocaRowExists = true;
+            const { data } = await db.from("student_memos").select("*").eq("이름", stName).like("메모", "[MYVOCA_DATA]%");
+            if (data && data.length) {
+              const r = data[data.length - 1];
+              myVocaRowId = (r.id !== undefined && r.id !== null) ? r.id : null;
+            }
+          }
+        } catch (e) {
+          console.error("나만의 단어장 저장 실패:", e);
+        }
+      });
+      return myVocaSaving;
+    }
+
+    function addToMyVoca(w, countUp) {
+      const k = vocaKey(w.영어단어);
+      if (!k) return;
+      if (myVoca[k]) {
+        if (countUp) myVoca[k].count = (parseInt(myVoca[k].count, 10) || 1) + 1;
+      } else {
+        myVoca[k] = {
+          english: w.영어단어 || "",
+          meaning: w.뜻 || "",
+          pronunciation: w.발음기호 || "",
+          korPron: w.한글발음 || "",
+          example: w.예문 || "",
+          count: 1
+        };
+      }
+    }
+
+    function updateMyVocaButton() {
+      const btn = document.getElementById("myVocaBtn");
+      if (btn) btn.textContent = `⭐ 나만의 단어장 (${Object.keys(myVoca).length}개)`;
+    }
+
+    function toggleFlashVoca(idx) {
+      markUserInteraction();
+      const w = flashList[idx];
+      if (!w) return;
+      const k = vocaKey(w.영어단어);
+      if (myVoca[k]) delete myVoca[k];
+      else addToMyVoca(w, false);
+      saveMyVoca();
+      updateMyVocaButton();
+      document.querySelectorAll("[data-voca-key]").forEach(el => {
+        if (el.dataset.vocaKey === k) {
+          const on = !!myVoca[k];
+          el.textContent = on ? "★ 담음" : "☆ 담기";
+          el.className = starClass(on);
+        }
+      });
+    }
+
+    function renderMyVocaCards() {
+      markUserInteraction();
+      const container = document.getElementById("flashcardsContainer");
+      const guide = document.getElementById("flashGuide");
+      const items = Object.entries(myVoca).sort((a, b) => (parseInt(b[1].count, 10) || 1) - (parseInt(a[1].count, 10) || 1));
+      container.innerHTML = "";
+      guide.classList.remove("hidden");
+      if (!items.length) {
+        guide.textContent = "⭐ 아직 담긴 단어가 없어요. 암기 카드의 ☆ 담기를 누르거나 단어시험을 보면 틀린 단어가 자동으로 들어와요.";
+        return;
+      }
+      guide.textContent = `⭐ 나만의 단어장 ${items.length}개 · 많이 틀린 단어부터 보여줘요. 다 외운 단어는 뒷면의 '외웠어요'를 눌러 빼세요!`;
+      items.forEach(([k, v]) => {
+        const cnt = parseInt(v.count, 10) || 1;
+        const card = document.createElement("div");
+        card.className = "flip-card";
+        card.onclick = () => { markUserInteraction(); card.classList.toggle("flipped"); };
+        card.innerHTML = `
+          <div class="flip-card-inner">
+            <div class="flip-card-front" style="background-color:#78350f;">
+              <span class="absolute top-2 right-2 text-[11px] font-extrabold px-2 py-1 rounded-full bg-amber-400 text-slate-900">${cnt > 1 ? "🔥 " + cnt + "회" : "★"}</span>
+              <h3 class="text-xl font-extrabold tracking-wide">${escapeHtml(v.english)}</h3>
+              <p class="text-xs text-amber-100 mt-1">${escapeHtml(v.pronunciation)}</p>
+              <p class="text-xs text-amber-200 font-bold mt-0.5">${escapeHtml(v.korPron)}</p>
+            </div>
+            <div class="flip-card-back" style="border-color:#b45309;">
+              <h3 class="text-base font-extrabold text-amber-900">${escapeHtml(v.meaning)}</h3>
+              <p class="text-xs text-slate-600 mt-2 leading-snug break-keep">${escapeHtml(v.example)}</p>
+              <button type="button" data-remove-key="${escapeHtml(k)}" class="mt-2 text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded-full">✔ 외웠어요 (빼기)</button>
+            </div>
+          </div>
+        `;
+        const rmBtn = card.querySelector("[data-remove-key]");
+        rmBtn.onclick = (ev) => {
+          ev.stopPropagation();
+          markUserInteraction();
+          delete myVoca[k];
+          saveMyVoca();
+          updateMyVocaButton();
+          renderMyVocaCards();
+        };
+        container.appendChild(card);
+      });
+      container.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
     function shuffleArray(arr) {
@@ -1453,6 +1616,17 @@
         if (examTimerInterval) clearInterval(examTimerInterval);
         localStorage.removeItem("pqrs_active_exam_v2");
 
+        // ⭐ 틀린 단어 → 나만의 단어장 자동 저장
+        if (myVocaOwner === examStudent) {
+          let addedWrong = 0;
+          examState.questions.filter(q => q.selectedIdx !== q.correctIdx).forEach(q => {
+            const wb = allWordbook.find(w => w.분류 === examState.cat && w.단어번호 === q.단어번호) || { 영어단어: q.영어단어, 뜻: q.정답뜻 };
+            addToMyVoca(wb, true);
+            addedWrong++;
+          });
+          if (addedWrong) { saveMyVoca(); updateMyVocaButton(); }
+        }
+
         if (status.startsWith("통과")) {
           confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
         }
@@ -1483,7 +1657,7 @@
       } else {
         wrongHtml = `
           <div class="mt-3 pt-3 border-t border-slate-200">
-            <p class="text-xs font-extrabold text-rose-700 mb-2">📝 틀린 단어 오답 확인 (${wrongList.length}개)</p>
+            <p class="text-xs font-extrabold text-rose-700 mb-2">📝 틀린 단어 오답 확인 (${wrongList.length}개) · ⭐ 나만의 단어장에 자동 저장됨</p>
             <div class="space-y-1.5 max-h-80 overflow-y-auto pr-1">
               ${wrongList.map(w => {
                 const myChoiceText = w.options[w.selectedIdx] || "미선택";
