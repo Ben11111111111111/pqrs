@@ -131,7 +131,7 @@
       <div id="rankSubBox_time" class="space-y-3">
         <div class="bg-amber-50 border border-amber-200 rounded-xl p-3.5 text-xs md:text-sm text-amber-950">
           🤫 <b>선생님이 불시에 '열공 단어왕' 상위권 학생에게 비밀스러운 선물을 증정합니다!</b><br>
-          <span class="text-xs text-amber-800">* 내 이름을 선택하고 [단어 암기장] 또는 [단어 시험]을 공부하면 1분 단위로 실제 공부 시간이 자동 누적됩니다. (장학금 포인트와는 별개입니다)</span>
+          <span class="text-xs text-amber-800">* 내 이름을 선택하고 [암기장]·[단어시험]·[CORE 과제]를 공부하면 실제 공부 시간이 자동 누적됩니다. 1분 동안 화면 터치가 없으면 측정이 멈춰요. (장학금 포인트와는 별개입니다)</span>
         </div>
 
         <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -222,7 +222,7 @@
         </div>
         <p class="text-xs text-slate-600 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2 mb-3 leading-relaxed">
           ✅ <b>90점 이상이면 통과!</b> 과제당 최대 <b>3번</b> 도전할 수 있어요.<br>
-          💎 장학금: 1번 만에 통과 <b>+1P</b> · 2번째 <b>+0.5P</b> · 3번째 <b>+0.25P</b>
+          💎 장학금(지문당): 1번 만에 통과 <b>+0.5P</b> · 2번째 <b>+0.25P</b> · 3번째 <b>+0.125P</b>
         </p>
         <div id="coreListContainer" class="space-y-2"></div>
       </div>
@@ -333,10 +333,11 @@
     let examTimerInterval = null;
     let isSubmittingExam = false;
 
-    // ⏱️ 순수 공부 시간(초) 측정 변수 (3분 이상 무반응 시 자동 일시정지)
+    // ⏱️ 순수 공부 시간(초) 측정 변수 (1분 이상 무반응 시 자동 일시정지)
     let activeStudySecondsToday = 0;
     let unsavedStudySeconds = 0;
     let lastInteractionTime = Date.now();
+    const IDLE_LIMIT_MS = 60 * 1000; // 1분 동안 터치·클릭·키보드·스크롤이 없으면 공부시간 멈춤
     let isSavingStudyTime = false;
     const MAX_DAILY_STUDY_MINS = 180; // 하루 최대 180분(3시간)까지 인정
 
@@ -382,7 +383,7 @@
 
       const isPageVisible = document.visibilityState === "visible";
       const isStudyingTab = (currentTab === "flash" || currentTab === "exam" || currentTab === "core");
-      const isRecentlyActive = (Date.now() - lastInteractionTime) < 180000; // 3분 이내 터치/클릭 활동
+      const isRecentlyActive = (Date.now() - lastInteractionTime) < IDLE_LIMIT_MS; // 1분 이내 터치/클릭 활동
 
       if (isPageVisible && isStudyingTab && isRecentlyActive) {
         activeStudySecondsToday++;
@@ -394,7 +395,9 @@
       if (badge) {
         badge.textContent = (isPageVisible && isStudyingTab && isRecentlyActive)
           ? `⏱️ 공부시간 측정중: 오늘 ${m}분 ${s}초`
-          : `⏸️ 공부시간 일시정지 (암기장·시험 탭에서 작동): 오늘 ${m}분 ${s}초`;
+          : (isPageVisible && isStudyingTab)
+            ? `⏸️ 1분간 활동이 없어 공부시간 멈춤 (화면을 터치하면 다시 측정): 오늘 ${m}분 ${s}초`
+            : `⏸️ 공부시간 일시정지 (암기장·시험·CORE 탭에서 작동): 오늘 ${m}분 ${s}초`;
       }
 
       if (unsavedStudySeconds >= 60 && !isSavingStudyTime) {
@@ -1704,7 +1707,7 @@
     let isSubmittingCore = false;
     const CORE_PASS_SCORE = 90;
     const CORE_MAX_TRIES = 3;
-    const CORE_POINTS_BY_TRY = [1, 0.5, 0.25];
+    const CORE_POINTS_BY_TRY = [0.5, 0.25, 0.125];
 
     function parseCoreAttempt(memo) {
       const m = String(memo || "").match(/시도\s*:\s*(\d+)\s*\/\s*3/);
