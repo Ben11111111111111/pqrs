@@ -52,10 +52,11 @@
       </div>
     </div>
     <div class="max-w-4xl mx-auto px-2 flex border-t border-blue-800 bg-blue-950 text-xs md:text-sm font-semibold">
+      <button onclick="switchTab('my')" id="tabBtn_my" class="flex-1 py-3 text-center border-b-4 border-transparent text-blue-200">🏠 내 현황</button>
       <button onclick="switchTab('rank')" id="tabBtn_rank" class="flex-1 py-3 text-center border-b-4 border-yellow-400 text-yellow-300">🏆 랭킹</button>
       <button onclick="switchTab('flash')" id="tabBtn_flash" class="flex-1 py-3 text-center border-b-4 border-transparent text-blue-200">📇 암기장</button>
       <button onclick="switchTab('exam')" id="tabBtn_exam" class="flex-1 py-3 text-center border-b-4 border-transparent text-blue-200">⏱️ 단어시험</button>
-      <button onclick="switchTab('core')" id="tabBtn_core" class="flex-1 py-3 text-center border-b-4 border-transparent text-blue-200">📝 CORE 과제</button>
+      <button onclick="switchTab('core')" id="tabBtn_core" class="flex-1 py-3 text-center border-b-4 border-transparent text-blue-200">📝 CORE</button>
     </div>
   </header>
 
@@ -101,6 +102,30 @@
       <p class="text-base md:text-lg font-extrabold text-amber-900">👆 화면 오른쪽 위에서 '내 이름'을 먼저 선택해 주세요!</p>
       <p class="text-xs text-amber-700 mt-1.5">내 이름을 선택하고 공부해야 나의 단어 공부 시간(분)이 자동으로 기록됩니다.</p>
     </div>
+
+    <!-- 탭: 🏠 내 현황 -->
+    <section id="tabContent_my" class="hidden space-y-4">
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+        <h2 class="text-base font-bold text-slate-800 mb-2">📅 내 수업 일정</h2>
+        <div id="mySchedule"></div>
+      </div>
+      <div class="bg-white p-4 rounded-xl shadow-sm border-2 border-rose-200">
+        <h2 class="text-base font-bold text-slate-800 mb-2">✅ 지금 챙겨야 할 것</h2>
+        <div id="myTodo" class="space-y-2"></div>
+      </div>
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+        <h2 class="text-base font-bold text-slate-800 mb-2">💎 내 포인트</h2>
+        <div id="myPointBox"></div>
+      </div>
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+        <h2 class="text-base font-bold text-slate-800 mb-2">📊 나의 위치</h2>
+        <div id="myPosition"></div>
+      </div>
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+        <h2 class="text-base font-bold text-slate-800 mb-2">📈 나의 학습 기록</h2>
+        <div id="myRecord"></div>
+      </div>
+    </section>
 
     <!-- 탭 0: 랭킹 & 시크릿 선물 -->
     <section id="tabContent_rank" class="hidden space-y-4">
@@ -330,7 +355,7 @@
     let myRetakes = [];
 
     let currentStudent = localStorage.getItem("pqrs_student") || "";
-    let currentTab = localStorage.getItem("pqrs_tab") || "rank";
+    let currentTab = localStorage.getItem("pqrs_tab") || "my";
     let examTimerInterval = null;
     let isSubmittingExam = false;
 
@@ -718,7 +743,9 @@
 
       try {
         const [stData, , wbData] = await Promise.all([
-          fetchAllRows("students", '이름, 학교, 학년, 상태, 오답허용률, 등원일정, "사전등원(분)", 보충일정'),
+          fetchAllRows("students", '이름, 학교, 학년, 상태, 오답허용률, 등원일정, "사전등원(분)", 보충일정, 현재단어장, 수업구성')
+            .catch(() => fetchAllRows("students", '이름, 학교, 학년, 상태, 오답허용률, 등원일정, "사전등원(분)", 보충일정, 현재단어장'))
+            .catch(() => fetchAllRows("students", '이름, 학교, 학년, 상태, 오답허용률, 등원일정, "사전등원(분)", 보충일정')),
           loadRankingData(),
           loadWordbookSmart(false)
         ]);
@@ -745,6 +772,7 @@
         if (currentStudent && activeList.includes(currentStudent)) {
           localStorage.setItem("pqrs_student", currentStudent);
           await loadStudentPersonalData(currentStudent);
+          applyMyDefaultWordbook();
         } else {
           currentStudent = "";
           localStorage.removeItem("pqrs_student");
@@ -802,6 +830,7 @@
       if (selected) {
         localStorage.setItem("pqrs_student", selected);
         await loadStudentPersonalData(selected);
+        applyMyDefaultWordbook();
         restoreOngoingExamIfAny();
       } else {
         localStorage.removeItem("pqrs_student");
@@ -822,7 +851,7 @@
         db.from("points").select("날짜, 이름, 내역, 포인트증감").eq("이름", stName),
         db.from("attendance").select("날짜, 출결, 사전등원달성, 비고").eq("이름", stName),
         db.from("vocab_tests").select("날짜, 이름, 점수, 결과, 비고").eq("이름", stName),
-        db.from("assignments").select("과제명, 결과, 날짜").eq("이름", stName).eq("결과", "진행중"),
+        db.from("assignments").select("과제명, 결과, 날짜, 선생님메모").eq("이름", stName),
         myGrade ? db.from("weekly_progress").select("*").eq("학년", myGrade) : Promise.resolve({ data: [] })
       ]);
 
@@ -889,7 +918,8 @@
       });
 
       const alertsBox = document.getElementById("myAlertsText");
-      const hws = hwRes.data || [];
+      const hwAll = hwRes.data || [];
+      const hws = hwAll.filter(h => h.결과 === "진행중");
       let alertLines = [];
       if (myRetakes.length > 0) {
         alertLines.push(`🚨 <b>단어 재시: ${myRetakes.length}건</b>`);
@@ -907,18 +937,31 @@
 
       renderRetakeQuickButtons();
 
+      myData = { name: stName, stInfo, pts: myPtData, att: attData, hw: hwAll, tests: myVocabTests, plans: wkRes.data || [] };
+      if (currentTab === "my") renderMyOverview();
+
       const wkBox = document.getElementById("weeklyProgressBox");
-      if (wkRes.data && wkRes.data.length > 0) {
-        const nonEmptyRows = wkRes.data.filter(r =>
-          String(r["1회차수업"] || "").trim() ||
-          String(r["2회차수업"] || "").trim() ||
-          String(r["클리닉"] || "").trim()
-        );
-        const w = nonEmptyRows.length > 0 ? nonEmptyRows[nonEmptyRows.length - 1] : wkRes.data[wkRes.data.length - 1];
-        document.getElementById("weeklyTitle").textContent = `📢 나의 이번 주 학습 진도 및 단어 범위 (${myGrade}) - 업데이트: ${w.업데이트일자 || ''}`;
-        document.getElementById("weekly1").textContent = String(w["1회차수업"] || "").trim() || "-";
-        document.getElementById("weekly2").textContent = String(w["2회차수업"] || "").trim() || "-";
-        document.getElementById("weeklyClinic").textContent = String(w["클리닉"] || "").trim() || "-";
+      const planRows = wkRes.data || [];
+      const thisPlan = findPlanFor(planRows, todayStr, stInfo.학교, stInfo.학년);
+      const legacyRows = planRows.filter(r => !String(r.주시작 || "").trim() && (String(r["1회차수업"] || "").trim() || String(r["2회차수업"] || "").trim() || String(r["클리닉"] || "").trim()));
+      const w = thisPlan || (legacyRows.length ? legacyRows[legacyRows.length - 1] : null);
+      if (w) {
+        const ws = weekStartStr(todayStr);
+        const smapW = mySessionMap(stInfo);
+        const daysOf = sess => Object.keys(smapW).filter(d => smapW[d] === sess);
+        document.getElementById("weeklyTitle").textContent = thisPlan
+          ? `📢 이번 주 학습 계획 (${ws.slice(5).replace("-", "/")} ~ ${addDaysStr(ws, 6).slice(5).replace("-", "/")}) · ${myGrade}`
+          : `📢 나의 이번 주 학습 진도 및 단어 범위 (${myGrade}) - 업데이트: ${w.업데이트일자 || ''}`;
+        const fill = (id, lessonKey, sess) => {
+          const el = document.getElementById(id);
+          const lesson = String(w[lessonKey] || "").trim() || "-";
+          const word = String(w[SESSION_WORD_KEY[sess]] || "").trim();
+          const days = daysOf(sess);
+          el.innerHTML = `${escapeHtml(lesson)}${word ? `<br><span class="inline-block mt-1 font-bold text-rose-700">📖 단어시험: ${escapeHtml(word)}</span>` : ""}${days.length ? `<br><span class="text-[11px] text-indigo-600">나: ${days.join("·")}요일</span>` : ""}`;
+        };
+        fill("weekly1", "1회차수업", "1회차");
+        fill("weekly2", "2회차수업", "2회차");
+        fill("weeklyClinic", "클리닉", "클리닉");
         wkBox.classList.remove("hidden");
       } else {
         wkBox.classList.add("hidden");
@@ -970,7 +1013,7 @@
       localStorage.setItem("pqrs_tab", tabName);
       markUserInteraction();
 
-      ["rank", "flash", "exam", "core"].forEach(t => {
+      ["my", "rank", "flash", "exam", "core"].forEach(t => {
         const btn = document.getElementById(`tabBtn_${t}`);
         const content = document.getElementById(`tabContent_${t}`);
         if (t === tabName) {
@@ -988,6 +1031,7 @@
         warnBox.classList.add("hidden");
         document.getElementById(`tabContent_${tabName}`).classList.remove("hidden");
         if (tabName === "core" && !coreActive) loadCoreAssignments();
+        if (tabName === "my") renderMyOverview();
       }
     }
 
@@ -2092,6 +2136,455 @@
       `;
       box.scrollIntoView({ behavior: "smooth", block: "start" });
     }
+
+
+    // =====================================================
+    // 🏠 내 현황 (수업 일정 · 챙길 것 · 포인트 · 나의 위치 · 학습 기록)
+    // =====================================================
+    let myData = null;
+    let myTodoActions = [];
+    function runMyAction(i) { const f = myTodoActions[i]; if (f) f(); }
+    const WEEK_KR = ["일", "월", "화", "수", "목", "금", "토"];
+
+    function parseTestRange(bigo) {
+      const m = String(bigo || "").trim().match(/^\[(본시험|재시험)\]\s*(.+?)\s+(\d+)\s*~\s*(\d+)\s*번/);
+      return m ? { kind: m[1], cat: m[2].trim(), s: parseInt(m[3], 10), e: parseInt(m[4], 10) } : null;
+    }
+
+    // 최근 본시험 기록으로 오늘 볼 범위 추천 (오늘 본 시험이 있으면 그 범위, 없으면 마지막 범위의 다음 범위)
+    function suggestNextRange(tests, cat) {
+      const nums = allWordbook.filter(w => w.분류 === cat).map(w => w.단어번호);
+      if (!nums.length) return null;
+      const mn = Math.min(...nums), mx = Math.max(...nums);
+      const today = getKSTDateString();
+      const rows = (tests || [])
+        .map((t, i) => ({ p: parseTestRange(t.비고), d: String(t.날짜 || ""), i }))
+        .filter(x => x.p && x.p.kind === "본시험" && x.p.cat === cat)
+        .sort((a, b) => a.d.localeCompare(b.d) || a.i - b.i);
+      const todays = rows.filter(x => x.d === today);
+      if (todays.length) { const p = todays[todays.length - 1].p; return { s: p.s, e: p.e, today: true }; }
+      const past = rows.filter(x => x.d < today);
+      if (!past.length) return { s: mn, e: Math.min(mn + 99, mx) };
+      const p = past[past.length - 1].p;
+      const size = Math.max(1, p.e - p.s + 1);
+      if (p.e + 1 > mx) return { s: p.s, e: p.e, last: true };
+      return { s: p.e + 1, e: Math.min(p.e + size, mx) };
+    }
+
+    function myCurrentCategory(stInfo, tests) {
+      const cats = new Set(allWordbook.map(w => w.분류));
+      const cur = String(stInfo.현재단어장 || "").trim();
+      if (cur && cats.has(cur)) return cur;
+      const rows = (tests || []).map(t => ({ p: parseTestRange(t.비고), d: String(t.날짜 || "") }))
+        .filter(x => x.p && x.p.kind === "본시험" && cats.has(x.p.cat)).sort((a, b) => a.d.localeCompare(b.d));
+      return rows.length ? rows[rows.length - 1].p.cat : "";
+    }
+
+    // 학생이 이름을 고르면: 현재 단어장과 추천 범위를 암기장·시험에 미리 넣어 둠
+    function applyMyDefaultWordbook() {
+      if (!myData) return;
+      const today = getKSTDateString();
+      const taken = takenRangesOn(myData.tests, today);
+      const planned = expectedTestsFor(myData.stInfo, today, myData.plans, myData.att).map(x => normRangeText(x.range)).filter(Boolean);
+      const pick = planned.find(p => !taken.has(p.key)) || planned[0];
+      let cat, sug;
+      if (pick) { cat = pick.cat; sug = { s: pick.s, e: pick.e }; }
+      else {
+        cat = myCurrentCategory(myData.stInfo, myData.tests);
+        if (!cat) return;
+        sug = suggestNextRange(myData.tests, cat);
+      }
+      ["flash", "exam"].forEach(k => {
+        const sel = document.getElementById(`${k}Cat`);
+        if (!sel || ![...sel.options].some(o => o.value === cat)) return;
+        sel.value = cat;
+        if (sug) {
+          document.getElementById(`${k}Start`).value = sug.s;
+          document.getElementById(`${k}End`).value = sug.e;
+        }
+      });
+    }
+
+
+    // ---------- 주간 스케줄(회차별 단어시험) ----------
+    const SESSIONS_JS = ["1회차", "2회차", "클리닉"];
+    const SESSION_WORD_KEY = { "1회차": "1회차단어", "2회차": "2회차단어", "클리닉": "클리닉단어" };
+    const normGrade = g => String(g || "").replace(/고|학년/g, "").trim() + "학년";
+
+    function weekStartStr(ds) {
+      const t = new Date(ds + "T00:00:00Z");
+      const wd = (t.getUTCDay() + 6) % 7;   // 월=0
+      t.setUTCDate(t.getUTCDate() - wd);
+      return t.toISOString().slice(0, 10);
+    }
+
+    function findPlanFor(plans, ds, school, grade) {
+      const ws = weekStartStr(ds);
+      const sub = (plans || []).filter(p => String(p.주시작 || "") === ws && normGrade(p.학년) === normGrade(grade));
+      const spec = sub.filter(p => String(p.학교 || "").trim() === String(school || "").trim() && String(p.학교 || "").trim() !== "");
+      if (spec.length) return spec[spec.length - 1];
+      const common = sub.filter(p => ["", "전체", "공통"].includes(String(p.학교 || "").trim()));
+      return common.length ? common[common.length - 1] : null;
+    }
+
+    function mySessionMap(stInfo) {
+      const given = {};
+      String(stInfo.수업구성 || "").split(",").forEach(it => {
+        const i = it.indexOf(":");
+        if (i < 0) return;
+        const k = it.slice(0, i).trim(), v = it.slice(i + 1).trim();
+        if ("월화수목금토일".includes(k) && k.length === 1) given[k] = v;
+      });
+      const { map } = parseMySchedule(stInfo);
+      const days = ["월", "화", "수", "목", "금", "토", "일"].filter(d => map[d]);
+      const out = {};
+      days.forEach((d, i) => { out[d] = given[d] || (i < SESSIONS_JS.length ? SESSIONS_JS[i] : "없음"); });
+      return out;
+    }
+
+    function planRange(plans, ds, stInfo, sess) {
+      if (!SESSION_WORD_KEY[sess]) return "";
+      const p = findPlanFor(plans, ds, stInfo.학교, stInfo.학년);
+      return p ? String(p[SESSION_WORD_KEY[sess]] || "").trim() : "";
+    }
+
+    function linkedDateOf(bigo, tag) {
+      const m = String(bigo || "").match(new RegExp(tag + "\\s*[:：]\\s*(\\d{4}-\\d{2}-\\d{2})"));
+      return m ? m[1] : "";
+    }
+
+    // 그날 봐야 할 단어시험 (정규 회차 / 보충일의 빠진 시험 / 미리수강) — 관리자 출결 보드와 같은 규칙
+    function expectedTestsFor(stInfo, ds, plans, att) {
+      const out = [];
+      const smap = mySessionMap(stInfo);
+      const { map } = parseMySchedule(stInfo);
+      const wkOf = d => WEEK_KR[new Date(d + "T00:00:00Z").getUTCDay()];
+      const todayRows = (att || []).filter(a => String(a.날짜) === ds);
+      const skipRegular = todayRows.some(a => a.출결 === "미리수강완료" || a.출결 === "이전수업참석");
+      const wk = wkOf(ds);
+      if (map[wk] && !skipRegular && SESSIONS_JS.includes(smap[wk])) {
+        out.push({ range: planRange(plans, ds, stInfo, smap[wk]), why: smap[wk] });
+      }
+      (att || []).forEach(a => {
+        if ((a.출결 === "보충예정" && linkedDateOf(a.비고, "보충예정") === ds) || (a.출결 === "보충완료" && linkedDateOf(a.비고, "보충완료") === ds)) {
+          const d0 = String(a.날짜).slice(0, 10), s0 = smap[wkOf(d0)];
+          out.push({ range: SESSIONS_JS.includes(s0) ? planRange(plans, d0, stInfo, s0) : "", why: `보충 (${d0.slice(5).replace("-", "/")} ${SESSIONS_JS.includes(s0) ? s0 : ""} 빠진 것)` });
+        }
+      });
+      todayRows.filter(a => a.출결 === "미리수강").forEach(a => {
+        const d1 = linkedDateOf(a.비고, "미리수강대체");
+        if (!d1) return;
+        const s1 = smap[wkOf(d1)];
+        out.push({ range: SESSIONS_JS.includes(s1) ? planRange(plans, d1, stInfo, s1) : "", why: `미리수강 (${d1.slice(5).replace("-", "/")} ${SESSIONS_JS.includes(s1) ? s1 : ""} 대신)` });
+      });
+      return out;
+    }
+
+    function takenRangesOn(tests, ds) {
+      const set = new Set();
+      (tests || []).forEach(t => {
+        if (String(t.날짜) !== ds || String(t.결과 || "").startsWith("미응시")) return;
+        const p = parseTestRange(t.비고);
+        if (p && p.kind === "본시험") set.add(`${p.cat} ${p.s}~${p.e}번`);
+      });
+      return set;
+    }
+
+    function normRangeText(txt) {
+      const m = String(txt || "").match(/^\s*(.+?)\s+(\d+)\s*~\s*(\d+)\s*번?\s*$/);
+      return m ? { cat: m[1].trim(), s: parseInt(m[2], 10), e: parseInt(m[3], 10), key: `${m[1].trim()} ${parseInt(m[2], 10)}~${parseInt(m[3], 10)}번` } : null;
+    }
+
+    function parseMySchedule(stInfo) {
+      const sched = String(stInfo.등원일정 || "");
+      const hasSlash = sched.includes("/");
+      const legacyEarly = parseInt(stInfo["사전등원(분)"], 10) || 0;
+      const map = {};
+      sched.split(",").forEach(it => {
+        const m = it.trim().match(/^([월화수목금토일])\s*\(([^)]*)\)/);
+        if (!m) return;
+        const [t, e] = m[2].split("/");
+        map[m[1]] = { time: (t || "").trim(), early: e !== undefined ? (parseInt(e, 10) || 0) : (hasSlash ? 0 : legacyEarly) };
+      });
+      const mk = {};
+      String(stInfo.보충일정 || "").split(",").forEach(it => {
+        const m = it.trim().match(/^(\d{4}-\d{2}-\d{2})\s*(?:\(([^)]*)\))?/);
+        if (!m) return;
+        const [t, e] = String(m[2] || "18:00").split("/");
+        mk[m[1]] = { time: (t || "18:00").trim(), early: parseInt(e, 10) || 0 };
+      });
+      return { map, mk };
+    }
+
+    function myUpcomingClasses(stInfo, days = 14) {
+      const { map, mk } = parseMySchedule(stInfo);
+      const today = getKSTDateString();
+      const out = [];
+      for (let i = 0; i < days; i++) {
+        const ds = addDaysStr(today, i);
+        const wk = WEEK_KR[new Date(ds + "T00:00:00Z").getUTCDay()];
+        if (mk[ds]) out.push({ ds, wk, ...mk[ds], type: "보충" });
+        else if (map[wk]) out.push({ ds, wk, ...map[wk], type: "정규" });
+      }
+      return out;
+    }
+
+    function minusMinutes(hhmm, mins) {
+      const [h, m] = String(hhmm).split(":").map(x => parseInt(x, 10));
+      if (isNaN(h)) return "";
+      const t = h * 60 + (m || 0) - mins;
+      return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
+    }
+
+    function pointCategory(desc) {
+      const d = String(desc || "");
+      if (d.startsWith("[공부시간]")) return null;
+      if (d.startsWith("[시크릿선물]")) return "🎁 시크릿 선물";
+      if (d.startsWith("단어 본시험")) return "📖 단어 본시험 통과";
+      if (d.startsWith("재시험")) return "🔁 단어 재시험 통과";
+      if (d.startsWith("CORE 과제")) return "📝 CORE 과제";
+      if (d.startsWith("과제 제출") || d.startsWith("과제 지각제출")) return "📚 일반 과제";
+      if (d.startsWith("클리닉")) return "🏥 클리닉";
+      if (d.startsWith("장학금")) return "💰 장학금 받음";
+      return "✨ 기타";
+    }
+
+    function hwState(row) {
+      const res = String(row.결과 || "").trim();
+      if (res === "제출") return "done";
+      if (res === "지각제출") return "late";
+      if (res === "미제출") return "miss";
+      const d = String(row.날짜 || "").slice(0, 10);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(d) && kstNowStamp() >= `${d} ${String(CORE_DEADLINE_HOUR).padStart(2, "0")}:00`) return "miss";
+      return "open";
+    }
+
+    function rateText(num, den) {
+      return den ? `${Math.round(num / den * 100)}%` : "-";
+    }
+
+    function goExamWithRange(cat, s, e) {
+      switchTab("exam");
+      const sel = document.getElementById("examCat");
+      if ([...sel.options].some(o => o.value === cat)) sel.value = cat;
+      document.getElementById("examStart").value = s;
+      document.getElementById("examEnd").value = e;
+      setTimeout(() => window.scrollTo({ top: document.getElementById("examSetupBox").offsetTop - 120, behavior: "smooth" }), 50);
+    }
+
+    function goRetake(rangeStr) {
+      switchTab("exam");
+      setTimeout(() => applyRetakeRange(rangeStr), 50);
+    }
+
+    function renderMyOverview() {
+      const boxIds = ["mySchedule", "myTodo", "myPointBox", "myPosition", "myRecord"];
+      if (!currentStudent || !myData || myData.name !== currentStudent) {
+        boxIds.forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = `<p class="text-sm text-slate-500">⏳ 불러오는 중...</p>`; });
+        return;
+      }
+      const { stInfo, pts, att, hw, tests } = myData;
+      const today = getKSTDateString();
+      const nowS = kstNowStamp();
+
+      // ---------- 📅 수업 일정 ----------
+      const classes = myUpcomingClasses(stInfo, 14);
+      const smapC = mySessionMap(stInfo);
+      classes.forEach(c => {
+        c.sess = c.type === "보충" ? "보충" : (SESSIONS_JS.includes(smapC[c.wk]) ? smapC[c.wk] : "");
+        const ex = expectedTestsFor(stInfo, c.ds, myData.plans || [], att).filter(x => normRangeText(x.range));
+        c.word = ex.length ? ex.map(x => x.range).join(" / ") : "";
+      });
+      const nextC = classes.find(c => c.ds > today || (c.ds === today && nowS < `${today} ${minusMinutes(c.time, -150)}`));
+      let schHtml = "";
+      if (!classes.length) {
+        schHtml = `<p class="text-sm text-slate-500">아직 수업 일정이 등록되지 않았어요. 선생님께 알려주세요!</p>`;
+      } else {
+        if (nextC) {
+          const dd = getDaysDiff(nextC.ds, today);
+          const when = dd === 0 ? "오늘" : dd === 1 ? "내일" : `${nextC.ds.slice(5).replace("-", "/")}`;
+          schHtml += `<div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-2">
+            <p class="text-xs text-blue-700 font-bold">다음 수업</p>
+            <p class="text-lg font-extrabold text-blue-950">${when} (${nextC.wk}) ${escapeHtml(nextC.time)} ${nextC.type === "보충" ? '<span class="text-xs bg-amber-400 text-slate-900 px-2 py-0.5 rounded-full ml-1">보충</span>' : (nextC.sess ? `<span class="text-xs bg-blue-900 text-white px-2 py-0.5 rounded-full ml-1">${escapeHtml(nextC.sess)}</span>` : "")}</p>
+            ${nextC.word ? `<p class="text-xs text-rose-700 font-bold mt-0.5">📖 단어시험: ${escapeHtml(nextC.word)}</p>` : ""}
+            ${nextC.early ? `<p class="text-xs text-indigo-700 font-bold mt-0.5">🏃 사전등원 ${nextC.early}분 전 → <b>${minusMinutes(nextC.time, nextC.early)}까지</b> 오기</p>` : ""}
+          </div>`;
+        }
+        schHtml += `<div class="flex flex-wrap gap-1.5">` + classes.slice(0, 8).map(c =>
+          `<span class="text-[11px] px-2 py-1 rounded-lg border ${c.ds === today ? "bg-blue-900 text-white border-blue-900" : "bg-slate-50 text-slate-700 border-slate-200"}">
+            ${c.ds.slice(5).replace("-", "/")}(${c.wk}) ${escapeHtml(c.time)}${c.sess ? ` ${escapeHtml(c.sess)}` : ""}${c.early ? ` · 사전${c.early}분` : ""}${c.word ? `<br><span class="${c.ds === today ? "text-yellow-200" : "text-rose-600"}">📖 ${escapeHtml(c.word)}</span>` : ""}</span>`).join("") + `</div>`;
+      }
+      document.getElementById("mySchedule").innerHTML = schHtml;
+
+      // ---------- ✅ 지금 챙겨야 할 것 ----------
+      const todo = [];
+      const todayClass = classes.find(c => c.ds === today);
+      const cat = myCurrentCategory(stInfo, tests);
+      const todayMain = (tests || []).filter(t => t.날짜 === today && String(t.비고 || "").startsWith("[본시험]") && !String(t.결과 || "").startsWith("미응시"));
+      const plans = myData.plans || [];
+      const expToday = expectedTestsFor(stInfo, today, plans, att).filter(x => normRangeText(x.range));
+      const takenToday = takenRangesOn(tests, today);
+      if (expToday.length) {
+        expToday.forEach(x => {
+          const r = normRangeText(x.range);
+          const done = (tests || []).filter(t => t.날짜 === today && !String(t.결과 || "").startsWith("미응시") && (() => { const p = parseTestRange(t.비고); return p && p.kind === "본시험" && `${p.cat} ${p.s}~${p.e}번` === r.key; })());
+          if (!done.length) {
+            todo.push({ cls: "bg-rose-50 border-rose-300", html: `📖 <b>오늘 ${escapeHtml(x.why)} 단어시험</b>: ${escapeHtml(r.key)}<br><span class="text-xs text-slate-600">선생님 주간 계획 범위예요</span>`,
+              act: () => goExamWithRange(r.cat, r.s, r.e), label: "시험 보러 가기", color: "bg-rose-600 hover:bg-rose-700" });
+          } else {
+            const last = done[done.length - 1];
+            const passed = String(last.결과 || "").includes("통과") && !String(last.결과 || "").includes("미통과");
+            todo.push({ cls: passed ? "bg-emerald-50 border-emerald-300" : "bg-amber-50 border-amber-300",
+              html: passed ? `✅ <b>오늘 ${escapeHtml(x.why)} 단어시험 통과!</b> <span class="text-xs text-slate-600">(${escapeHtml(r.key)} · ${escapeHtml(last.점수)}점)</span>`
+                           : `⚠️ <b>오늘 ${escapeHtml(x.why)} 단어시험 미통과</b> <span class="text-xs text-slate-600">(${escapeHtml(r.key)}) → 아래 재시를 꼭 통과하세요</span>` });
+          }
+        });
+      } else if (todayClass) {
+        if (!todayMain.length) {
+          const sug = cat ? suggestNextRange(tests, cat) : null;
+          const rngTxt = sug ? `${cat} ${sug.s}~${sug.e}번` : "선생님이 정한 범위";
+          todo.push({ cls: "bg-rose-50 border-rose-300", html: `📖 <b>오늘 단어 본시험을 아직 안 봤어요</b><br><span class="text-xs text-slate-600">추천 범위: ${escapeHtml(rngTxt)} (다르면 시험 화면에서 바꾸세요)</span>`,
+            act: sug ? () => goExamWithRange(cat, sug.s, sug.e) : null, label: "시험 보러 가기", color: "bg-rose-600 hover:bg-rose-700" });
+        } else {
+          const last = todayMain[todayMain.length - 1];
+          const passed = String(last.결과 || "").includes("통과") && !String(last.결과 || "").includes("미통과");
+          todo.push({ cls: passed ? "bg-emerald-50 border-emerald-300" : "bg-amber-50 border-amber-300",
+            html: passed ? `✅ <b>오늘 본시험 통과!</b> <span class="text-xs text-slate-600">(${escapeHtml(extractPureRange(last.비고))} · ${escapeHtml(last.점수)}점)</span>`
+                         : `⚠️ <b>오늘 본시험 미통과</b> <span class="text-xs text-slate-600">(${escapeHtml(extractPureRange(last.비고))}) → 아래 재시를 꼭 통과하세요</span>` });
+        }
+      }
+      (myRetakes || []).forEach(r => {
+        todo.push({ cls: "bg-rose-50 border-rose-300", html: `🚨 <b>단어 재시</b>: ${escapeHtml(r.range)} <span class="text-xs text-slate-500">(${escapeHtml(r.date)})</span><br><span class="text-[11px] text-slate-600">24시간 안에 통과하면 +0.5P</span>`,
+          act: () => goRetake(r.range), label: "재시 보기", color: "bg-rose-600 hover:bg-rose-700" });
+      });
+      const coreRows = (hw || []).filter(h => String(h.과제명 || "").startsWith("[CORE]")).map(h => ({ h, ph: corePhase(h) }));
+      coreRows.filter(x => x.ph.phase === "open").sort((a, b) => String(a.h.날짜).localeCompare(String(b.h.날짜))).forEach(x => {
+        todo.push({ cls: "bg-indigo-50 border-indigo-300", html: `📝 <b>CORE</b>: ${escapeHtml(coreTitleOf(x.h))}<br><span class="text-xs text-slate-600">${x.ph.dday <= 0 ? "<b class='text-rose-600'>오늘 밤 10시 마감!</b>" : `마감 ${escapeHtml(String(x.h.날짜).slice(5))} 밤 10시 (D-${x.ph.dday})`} · 도전 ${parseCoreAttempt(x.h.선생님메모)}/3</span>`,
+          act: () => switchTab("core"), label: "풀러 가기", color: "bg-indigo-700 hover:bg-indigo-800" });
+      });
+      const normalRows = (hw || []).filter(h => !String(h.과제명 || "").startsWith("[CORE]"));
+      normalRows.filter(h => hwState(h) === "open").sort((a, b) => String(a.날짜).localeCompare(String(b.날짜))).forEach(h => {
+        const dd = getDaysDiff(String(h.날짜).slice(0, 10), today);
+        todo.push({ cls: "bg-sky-50 border-sky-300", html: `📚 <b>과제</b>: ${escapeHtml(h.과제명)}<br><span class="text-xs text-slate-600">${dd <= 0 ? "<b class='text-rose-600'>오늘 밤 10시 마감!</b>" : `마감 ${escapeHtml(String(h.날짜).slice(5))} 밤 10시 (D-${dd})`} · 선생님께 제출하면 +1P</span>` });
+      });
+      coreRows.filter(x => x.ph.phase === "late").forEach(x => {
+        todo.push({ cls: "bg-amber-50 border-amber-300", html: `⏰ <b>CORE 늦게 내기</b>: ${escapeHtml(coreTitleOf(x.h))}<br><span class="text-xs text-slate-600">마감 지남 · 포인트 절반 · ${x.ph.daysLeft <= 0 ? "오늘 밤 10시까지" : x.ph.daysLeft + "일 남음"}</span>`,
+          act: () => switchTab("core"), label: "늦게 도전", color: "bg-amber-600 hover:bg-amber-700" });
+      });
+      normalRows.filter(h => hwState(h) === "miss" && getDaysDiff(today, String(h.날짜).slice(0, 10)) <= 14).forEach(h => {
+        todo.push({ cls: "bg-slate-50 border-slate-300", html: `⌛ <b>마감 지난 과제</b>: ${escapeHtml(h.과제명)} <span class="text-xs text-slate-500">(${escapeHtml(String(h.날짜).slice(5))})</span><br><span class="text-[11px] text-slate-600">늦게라도 선생님께 내면 포인트 절반(+0.5P)</span>` });
+      });
+      myTodoActions = [];
+      document.getElementById("myTodo").innerHTML = todo.length
+        ? todo.map(t => {
+            let btn = "";
+            if (t.act) {
+              myTodoActions.push(t.act);
+              btn = `<button onclick="runMyAction(${myTodoActions.length - 1})" class="shrink-0 ${t.color} text-white text-xs font-bold px-3 py-2 rounded-lg">${t.label}</button>`;
+            }
+            return `<div class="flex items-center justify-between gap-2 border rounded-lg px-3 py-2.5 text-sm ${t.cls}"><div class="min-w-0 break-keep">${t.html}</div>${btn}</div>`;
+          }).join("")
+        : `<p class="text-sm text-emerald-700 font-bold">🎉 지금 챙길 것이 없어요! 단어 공부로 공부시간을 늘려 볼까요?</p>`;
+
+      // ---------- 💎 내 포인트 ----------
+      const total = (pts || []).reduce((a, r) => a + (parseFloat(r.포인트증감) || 0), 0);
+      const totalR = Math.round(total * 1000) / 1000;
+      const toGoal = Math.max(0, 50 - totalR);
+      const pct = Math.max(0, Math.min(100, Math.round(totalR / 50 * 100)));
+      const cats = {};
+      (pts || []).forEach(r => {
+        const c = pointCategory(r.내역);
+        if (!c) return;
+        if (!cats[c]) cats[c] = { n: 0, p: 0 };
+        cats[c].n += 1;
+        cats[c].p += parseFloat(r.포인트증감) || 0;
+      });
+      const hist = (pts || []).filter(r => pointCategory(r.내역)).sort((a, b) => String(b.날짜).localeCompare(String(a.날짜))).slice(0, 12);
+      document.getElementById("myPointBox").innerHTML = `
+        <div class="flex items-end justify-between mb-1">
+          <p class="text-3xl font-black text-emerald-800">${Number(totalR)}<span class="text-base"> P</span></p>
+          <p class="text-xs font-bold text-emerald-700">${toGoal > 0 ? `장학금(50P)까지 <b>${Math.round(toGoal * 1000) / 1000}P</b> 남음` : "🎊 50P 달성! 선생님께 장학금을 받으세요"}</p>
+        </div>
+        <div class="w-full h-3 bg-emerald-100 rounded-full overflow-hidden mb-3"><div class="h-3 bg-emerald-500" style="width:${pct}%"></div></div>
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-1.5 mb-3">
+          ${Object.keys(cats).length ? Object.entries(cats).sort((a, b) => b[1].p - a[1].p).map(([k, v]) =>
+            `<div class="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 text-xs"><p class="font-bold text-slate-700">${k}</p><p class="text-slate-600">${v.n}회 · <b class="${v.p < 0 ? "text-rose-600" : "text-emerald-700"}">${v.p > 0 ? "+" : ""}${Math.round(v.p * 1000) / 1000}P</b></p></div>`).join("")
+            : `<p class="text-xs text-slate-500 col-span-3">아직 받은 포인트가 없어요.</p>`}
+        </div>
+        ${hist.length ? `<p class="text-xs font-bold text-slate-600 mb-1">최근 포인트 내역</p>
+        <div class="divide-y divide-slate-100 border border-slate-200 rounded-lg text-xs">
+          ${hist.map(r => { const v = parseFloat(r.포인트증감) || 0; return `<div class="flex justify-between px-2.5 py-1.5"><span class="text-slate-500 shrink-0 mr-2">${escapeHtml(String(r.날짜).slice(5))}</span><span class="flex-1 text-slate-800 break-keep">${escapeHtml(r.내역)}</span><b class="${v < 0 ? "text-rose-600" : "text-emerald-700"} shrink-0 ml-2">${v > 0 ? "+" : ""}${v}P</b></div>`; }).join("")}
+        </div>` : ""}`;
+
+      // ---------- 📊 나의 위치 ----------
+      const norm = g => String(g || "").replace(/고|학년/g, "").trim() + "학년";
+      const valid = allStudents.filter(s => s.상태 === "재원" || s.상태 === "휴원");
+      const myGroup = valid.filter(s => s.학교 === stInfo.학교 && norm(s.학년) === norm(stInfo.학년)).map(s => s.이름);
+      const allNames = valid.map(s => s.이름);
+      const val = (nm, key) => {
+        if (nm === currentStudent && key === "total") return totalR;
+        return (pointsSummary[nm] || {})[key] || 0;
+      };
+      const metric = (key, label, unit, fmt) => {
+        const mine = val(currentStudent, key);
+        const g = myGroup.map(n => val(n, key));
+        const avg = g.length ? g.reduce((a, b) => a + b, 0) / g.length : 0;
+        const rankG = 1 + g.filter(v => v > mine).length;
+        const rankA = 1 + allNames.map(n => val(n, key)).filter(v => v > mine).length;
+        const maxV = Math.max(mine, avg, 1);
+        const diff = mine - avg;
+        return `<div class="border border-slate-200 rounded-lg p-3">
+          <div class="flex items-center justify-between"><p class="text-xs font-bold text-slate-700">${label}</p>
+            <p class="text-[11px] font-extrabold ${rankG <= Math.ceil(myGroup.length / 3) ? "text-emerald-700" : "text-slate-600"}">우리 학년 ${myGroup.length}명 중 <b>${rankG}등</b> · 전체 ${allNames.length}명 중 ${rankA}등</p></div>
+          <div class="mt-2 space-y-1 text-[11px]">
+            <div class="flex items-center gap-2"><span class="w-10 shrink-0 font-bold text-blue-900">나</span><div class="flex-1 h-2.5 bg-slate-100 rounded-full overflow-hidden"><div class="h-2.5 bg-blue-600" style="width:${Math.round(mine / maxV * 100)}%"></div></div><span class="w-20 text-right font-bold">${fmt(mine)}</span></div>
+            <div class="flex items-center gap-2"><span class="w-10 shrink-0 text-slate-500">평균</span><div class="flex-1 h-2.5 bg-slate-100 rounded-full overflow-hidden"><div class="h-2.5 bg-slate-400" style="width:${Math.round(avg / maxV * 100)}%"></div></div><span class="w-20 text-right text-slate-600">${fmt(avg)}</span></div>
+          </div>
+          <p class="text-[11px] mt-1 ${diff >= 0 ? "text-emerald-700" : "text-rose-600"} font-bold">${diff >= 0 ? `평균보다 ${fmt(diff)} 많아요 👍` : `평균보다 ${fmt(-diff)} 적어요 · 조금만 더 힘내요!`}</p>
+        </div>`;
+      };
+      const groupLabel = `${escapeHtml(stInfo.학교 || "")} ${norm(stInfo.학년)}`;
+      document.getElementById("myPosition").innerHTML = `
+        <p class="text-xs text-slate-500 mb-2">비교 대상: <b>${groupLabel}</b> 친구들 (이름은 공개되지 않아요)</p>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+          ${metric("total", "💎 장학금 포인트", "P", v => `${Math.round(v * 10) / 10}P`)}
+          ${metric("mins", "⏱️ 누적 공부시간", "분", v => formatMinutesPretty(Math.round(v)))}
+          ${metric("days", "📅 공부한 날", "일", v => `${Math.round(v * 10) / 10}일`)}
+        </div>`;
+
+      // ---------- 📈 나의 학습 기록 ----------
+      const hwStat = list => {
+        const st = list.map(hwState);
+        const done = st.filter(s => s === "done" || s === "late").length;
+        const late = st.filter(s => s === "late").length;
+        const miss = st.filter(s => s === "miss").length;
+        const open = st.filter(s => s === "open").length;
+        return { done, late, miss, open, rate: rateText(done, done + miss) };
+      };
+      const hc = hwStat(coreRows.map(x => x.h)), hn = hwStat(normalRows);
+      const isExpiredMk = x => {
+        if (x.출결 !== "보충예정") return false;
+        const m = String(x.비고 || "").match(/보충예정\s*[:：]\s*(\d{4}-\d{2}-\d{2})/);
+        const exp = m ? m[1] : (x.날짜 ? addDaysStr(String(x.날짜).slice(0, 10), 14) : "");
+        return !!exp && exp < today;
+      };
+      const present = (att || []).filter(x => ["출석", "지각", "보충", "미리수강"].includes(x.출결)).length;
+      const absent = (att || []).filter(x => x.출결 === "결석" || isExpiredMk(x)).length;
+      const lateCnt = (att || []).filter(x => x.출결 === "지각").length;
+      const month = today.slice(0, 7);
+      const mTests = (tests || []).filter(t => String(t.날짜 || "").startsWith(month) && !String(t.결과 || "").startsWith("미응시"));
+      const mPass = mTests.filter(t => String(t.결과 || "").includes("통과") && !String(t.결과 || "").includes("미통과")).length;
+      const mAvg = mTests.length ? Math.round(mTests.reduce((a, t) => a + (parseFloat(t.점수) || 0), 0) / mTests.length) : null;
+      const card = (title, big, sub, color) => `<div class="bg-${color}-50 border border-${color}-200 rounded-lg p-3"><p class="text-[11px] font-bold text-${color}-700">${title}</p><p class="text-xl font-extrabold text-${color}-900">${big}</p><p class="text-[11px] text-slate-600">${sub}</p></div>`;
+      document.getElementById("myRecord").innerHTML = `<div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+        ${card("📝 CORE 과제 제출율", hc.rate, `${hc.done}/${hc.done + hc.miss}건${hc.late ? ` (지각 ${hc.late})` : ""}${hc.open ? ` · 진행중 ${hc.open}` : ""}`, "indigo")}
+        ${card("📚 일반 과제 제출율", hn.rate, `${hn.done}/${hn.done + hn.miss}건${hn.late ? ` (지각 ${hn.late})` : ""}${hn.open ? ` · 진행중 ${hn.open}` : ""}`, "sky")}
+        ${card("📅 출석률", rateText(present, present + absent), `지각 ${lateCnt}회 · 결석 ${absent}회`, "blue")}
+        ${card(`📖 ${Number(month.slice(5))}월 단어시험`, rateText(mPass, mTests.length), `${mTests.length}회 응시 · ${mPass}회 통과${mAvg !== null ? ` · 평균 ${mAvg}점` : ""}`, "amber")}
+      </div>
+      ${cat ? `<p class="text-xs text-slate-600 mt-2">📚 지금 외우는 단어장: <b>${escapeHtml(cat)}</b></p>` : ""}`;
+    }
+
 
     window.addEventListener("DOMContentLoaded", initApp);
   </script>
