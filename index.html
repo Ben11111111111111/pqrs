@@ -955,9 +955,13 @@
         const fill = (id, lessonKey, sess) => {
           const el = document.getElementById(id);
           const lesson = String(w[lessonKey] || "").trim() || "-";
-          const word = String(w[SESSION_WORD_KEY[sess]] || "").trim();
+          const hasWords = thisPlan && parsePlanWords(w[SESSION_WORD_KEY[sess]]).length > 0;
+          const myWord = thisPlan ? planRange(planRows, todayStr, stInfo, sess, myVocabTests) : String(w[SESSION_WORD_KEY[sess]] || "").trim();
           const days = daysOf(sess);
-          el.innerHTML = `${escapeHtml(lesson)}${word ? `<br><span class="inline-block mt-1 font-bold text-rose-700">📖 단어시험: ${escapeHtml(word)}</span>` : ""}${days.length ? `<br><span class="text-[11px] text-indigo-600">나: ${days.join("·")}요일</span>` : ""}`;
+          const wordHtml = myWord
+            ? `<br><span class="inline-block mt-1 font-bold text-rose-700">📖 내 단어시험: ${escapeHtml(myWord)}</span>`
+            : (hasWords ? `<br><span class="inline-block mt-1 text-[11px] text-slate-500">📖 내 단어장 범위는 선생님께 확인하세요</span>` : "");
+          el.innerHTML = `${escapeHtml(lesson)}${wordHtml}${days.length ? `<br><span class="text-[11px] text-indigo-600">나: ${days.join("·")}요일</span>` : ""}`;
         };
         fill("weekly1", "1회차수업", "1회차");
         fill("weekly2", "2회차수업", "2회차");
@@ -2242,10 +2246,34 @@
       return out;
     }
 
-    function planRange(plans, ds, stInfo, sess) {
+    const CONTINUE_WORD_JS = "이어서";
+    // '점단어 101~200번 / 선단어 이어서' → [{cat, s, e}, {cat, cont:true}]
+    function parsePlanWords(txt) {
+      return String(txt || "").split("/").map(x => x.trim()).filter(Boolean).map(part => {
+        let m = part.match(/^(.+?)\s+(\d+)\s*~\s*(\d+)\s*번?$/);
+        if (m) return { cat: m[1].trim(), s: parseInt(m[2], 10), e: parseInt(m[3], 10) };
+        m = part.match(/^(.+?)\s+이어서$/);
+        if (m) return { cat: m[1].trim(), cont: true };
+        return null;
+      }).filter(Boolean);
+    }
+
+    // 그 주 계획에서 '내 단어장' 줄의 범위 ('이어서'면 내 최근 시험의 다음 범위)
+    function planRange(plans, ds, stInfo, sess, tests) {
       if (!SESSION_WORD_KEY[sess]) return "";
       const p = findPlanFor(plans, ds, stInfo.학교, stInfo.학년);
-      return p ? String(p[SESSION_WORD_KEY[sess]] || "").trim() : "";
+      if (!p) return "";
+      const items = parsePlanWords(p[SESSION_WORD_KEY[sess]]);
+      if (!items.length) return "";
+      const book = myCurrentCategory(stInfo, tests);
+      let hit = book ? items.find(x => x.cat === book) : null;
+      if (!hit && !book && items.length === 1) hit = items[0];
+      if (!hit) return "";
+      if (hit.cont) {
+        const sug = suggestNextRange(tests, hit.cat);
+        return sug ? `${hit.cat} ${sug.s}~${sug.e}번` : "";
+      }
+      return `${hit.cat} ${hit.s}~${hit.e}번`;
     }
 
     function linkedDateOf(bigo, tag) {
@@ -2254,7 +2282,8 @@
     }
 
     // 그날 봐야 할 단어시험 (정규 회차 / 보충일의 빠진 시험 / 미리수강) — 관리자 출결 보드와 같은 규칙
-    function expectedTestsFor(stInfo, ds, plans, att) {
+    function expectedTestsFor(stInfo, ds, plans, att, tests) {
+      tests = tests || (myData ? myData.tests : []);
       const out = [];
       const smap = mySessionMap(stInfo);
       const { map } = parseMySchedule(stInfo);
@@ -2263,19 +2292,19 @@
       const skipRegular = todayRows.some(a => a.출결 === "미리수강완료" || a.출결 === "이전수업참석");
       const wk = wkOf(ds);
       if (map[wk] && !skipRegular && SESSIONS_JS.includes(smap[wk])) {
-        out.push({ range: planRange(plans, ds, stInfo, smap[wk]), why: smap[wk] });
+        out.push({ range: planRange(plans, ds, stInfo, smap[wk], tests), why: smap[wk] });
       }
       (att || []).forEach(a => {
         if ((a.출결 === "보충예정" && linkedDateOf(a.비고, "보충예정") === ds) || (a.출결 === "보충완료" && linkedDateOf(a.비고, "보충완료") === ds)) {
           const d0 = String(a.날짜).slice(0, 10), s0 = smap[wkOf(d0)];
-          out.push({ range: SESSIONS_JS.includes(s0) ? planRange(plans, d0, stInfo, s0) : "", why: `보충 (${d0.slice(5).replace("-", "/")} ${SESSIONS_JS.includes(s0) ? s0 : ""} 빠진 것)` });
+          out.push({ range: SESSIONS_JS.includes(s0) ? planRange(plans, d0, stInfo, s0, tests) : "", why: `보충 (${d0.slice(5).replace("-", "/")} ${SESSIONS_JS.includes(s0) ? s0 : ""} 빠진 것)` });
         }
       });
       todayRows.filter(a => a.출결 === "미리수강").forEach(a => {
         const d1 = linkedDateOf(a.비고, "미리수강대체");
         if (!d1) return;
         const s1 = smap[wkOf(d1)];
-        out.push({ range: SESSIONS_JS.includes(s1) ? planRange(plans, d1, stInfo, s1) : "", why: `미리수강 (${d1.slice(5).replace("-", "/")} ${SESSIONS_JS.includes(s1) ? s1 : ""} 대신)` });
+        out.push({ range: SESSIONS_JS.includes(s1) ? planRange(plans, d1, stInfo, s1, tests) : "", why: `미리수강 (${d1.slice(5).replace("-", "/")} ${SESSIONS_JS.includes(s1) ? s1 : ""} 대신)` });
       });
       return out;
     }
