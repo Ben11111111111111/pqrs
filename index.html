@@ -221,8 +221,9 @@
           <button onclick="loadCoreAssignments()" class="text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold px-2.5 py-1 rounded border border-slate-300">🔄 새로고침</button>
         </div>
         <p class="text-xs text-slate-600 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2 mb-3 leading-relaxed">
-          ✅ <b>90점 이상이면 통과!</b> 과제당 최대 <b>3번</b> 도전할 수 있어요.<br>
-          💎 장학금(지문당): 1번 만에 통과 <b>+0.5P</b> · 2번째 <b>+0.25P</b> · 3번째 <b>+0.125P</b>
+          ✅ <b>90점 이상이면 통과!</b> 과제당 최대 <b>3번</b> 도전할 수 있어요. ⏰ 마감은 <b>마감일 밤 10시</b>!<br>
+          💎 장학금(지문당): 1번 만에 통과 <b>+0.5P</b> · 2번째 <b>+0.25P</b> · 3번째 <b>+0.125P</b><br>
+          🐢 마감 후 7일까지는 늦게 낼 수 있지만 <b>포인트는 절반</b>이에요.
         </p>
         <div id="coreListContainer" class="space-y-2"></div>
       </div>
@@ -558,6 +559,18 @@
       return list.join(", ");
     }
 
+    function addDaysStr(ds, n) {
+      const t = new Date(ds + "T00:00:00Z");
+      if (isNaN(t)) return "";
+      t.setUTCDate(t.getUTCDate() + n);
+      return t.toISOString().slice(0, 10);
+    }
+
+    function kstNowStamp() {
+      const k = getKSTNow();
+      return `${getKSTDateString()} ${String(k.getHours()).padStart(2, "0")}:${String(k.getMinutes()).padStart(2, "0")}`;
+    }
+
     function getDaysDiff(dateStr1, dateStr2) {
       const d1 = new Date(dateStr1);
       const d2 = new Date(dateStr2);
@@ -807,7 +820,7 @@
 
       const [ptRes, attRes, vocRes, hwRes, wkRes] = await Promise.all([
         db.from("points").select("날짜, 이름, 내역, 포인트증감").eq("이름", stName),
-        db.from("attendance").select("출결, 사전등원달성").eq("이름", stName),
+        db.from("attendance").select("날짜, 출결, 사전등원달성, 비고").eq("이름", stName),
         db.from("vocab_tests").select("날짜, 이름, 점수, 결과, 비고").eq("이름", stName),
         db.from("assignments").select("과제명, 결과, 날짜").eq("이름", stName).eq("결과", "진행중"),
         myGrade ? db.from("weekly_progress").select("*").eq("학년", myGrade) : Promise.resolve({ data: [] })
@@ -830,12 +843,26 @@
       document.getElementById("myStudyTimeText").textContent = formatMinutesPretty(totalStudyMins);
 
       const attData = attRes.data || [];
+      // 보충예정인데 보충 날짜(없으면 14일)가 지나도 안 오면 결석으로 셉니다 (관리자 화면과 같은 규칙)
+      const isExpiredMakeup = (x) => {
+        if (x.출결 !== "보충예정") return false;
+        const m = String(x.비고 || "").match(/보충예정\s*[:：]\s*(\d{4}-\d{2}-\d{2})/);
+        const exp = m ? m[1] : (x.날짜 ? addDaysStr(String(x.날짜).slice(0, 10), 14) : "");
+        return !!exp && exp < todayStr;
+      };
       const attC = attData.filter(x => x.출결 === "출석").length;
       const mkC = attData.filter(x => x.출결 === "보충").length;
+      const preC = attData.filter(x => x.출결 === "미리수강").length;
       const lateC = attData.filter(x => x.출결 === "지각").length;
-      const absC = attData.filter(x => x.출결 === "결석").length;
+      const absC = attData.filter(x => x.출결 === "결석" || isExpiredMakeup(x)).length;
+      const excC = attData.filter(x => x.출결 === "공결").length;
       const earlyC = attData.filter(x => x.사전등원달성 === "성공").length;
-      let attHtml = `출석 ${attC} / 보충 ${mkC}<br>지각 ${lateC} / 결석 ${absC}`;
+      let attHtml = `출석 ${attC} / 지각 ${lateC} / 결석 ${absC}`;
+      const extraAtt = [];
+      if (mkC) extraAtt.push(`보충 ${mkC}`);
+      if (preC) extraAtt.push(`미리수강 ${preC}`);
+      if (excC) extraAtt.push(`공결 ${excC}`);
+      if (extraAtt.length) attHtml += `<br>${extraAtt.join(" / ")}`;
       if (earlySummaryText || earlyC > 0) {
         attHtml += `<br><span class="text-indigo-700">일찍오기: ${earlyC}회</span>`;
       }
@@ -867,8 +894,14 @@
       if (myRetakes.length > 0) {
         alertLines.push(`🚨 <b>단어 재시: ${myRetakes.length}건</b>`);
       }
-      if (hws.length > 0) {
-        alertLines.push(`📝 <b>미제출 과제: ${hws.length}건</b>`);
+      const nowStamp = kstNowStamp();
+      const hwsOpen = hws.filter(h => !h.날짜 || nowStamp < `${String(h.날짜).slice(0, 10)} ${String(CORE_DEADLINE_HOUR).padStart(2, "0")}:00`);
+      const hwsOver = hws.length - hwsOpen.length;
+      if (hwsOpen.length > 0) {
+        alertLines.push(`📝 <b>해야 할 과제: ${hwsOpen.length}건</b>`);
+      }
+      if (hwsOver > 0) {
+        alertLines.push(`⌛ <b>마감 지난 과제: ${hwsOver}건</b>`);
       }
       alertsBox.innerHTML = alertLines.length > 0 ? alertLines.join("<br>") : "<span class='text-emerald-700 font-bold'>🎉 모두 완료!</span>";
 
@@ -1598,22 +1631,7 @@
             }
           }
 
-          if (!isRetake) {
-            const { data: attToday } = await db.from("attendance").select("*").eq("이름", examStudent).eq("날짜", todayStr);
-            if (!attToday || attToday.length === 0) {
-              const isMakeupToday = String(stInfo.보충일정 || "").includes(todayStr);
-              if (earlyReqToday === 0) {
-                await safeInsert("attendance", {
-                  날짜: todayStr,
-                  이름: examStudent,
-                  출결: isMakeupToday ? "보충" : "출석",
-                  등원시간: "-",
-                  사전등원달성: "해당없음",
-                  비고: "본시험제출 자동출결"
-                });
-              }
-            }
-          }
+          // 출결은 선생님이 관리자 '출결 보드'에서 확정합니다 (시험 제출 = 자동 출석 기능은 없앰)
         }
 
         if (examTimerInterval) clearInterval(examTimerInterval);
@@ -1708,6 +1726,26 @@
     const CORE_PASS_SCORE = 90;
     const CORE_MAX_TRIES = 3;
     const CORE_POINTS_BY_TRY = [0.5, 0.25, 0.125];
+    const CORE_DEADLINE_HOUR = 22;   // 마감일 밤 10시 마감
+    const CORE_LATE_DAYS = 7;        // 마감 후 7일까지 늦게 제출 가능 (포인트 절반)
+
+    // 과제 상태: open(마감 전) / late(마감 후 늦게 내기 가능) / closed(기간 끝) / done(통과) / lateDone(지각 통과) / failed(3번 실패)
+    function corePhase(row) {
+      const res = String(row.결과 || "").trim();
+      const memo = String(row.선생님메모 || "");
+      const tries = parseCoreAttempt(memo);
+      if (res === "제출") return { phase: "done" };
+      if (res === "지각제출") return { phase: "lateDone" };
+      if (memo.includes("최종 미통과") || tries >= CORE_MAX_TRIES) return { phase: "failed" };
+      const d = String(row.날짜 || "").slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return { phase: res === "진행중" ? "open" : "closed" };
+      const nowS = kstNowStamp();
+      const today = getKSTDateString();
+      if (nowS < `${d} ${CORE_DEADLINE_HOUR}:00`) return { phase: "open", dday: getDaysDiff(d, today) };
+      const lateEnd = addDaysStr(d, CORE_LATE_DAYS);
+      if (nowS < `${lateEnd} ${CORE_DEADLINE_HOUR}:00`) return { phase: "late", daysLeft: getDaysDiff(lateEnd, today) };
+      return { phase: "closed" };
+    }
 
     function parseCoreAttempt(memo) {
       const m = String(memo || "").match(/시도\s*:\s*(\d+)\s*\/\s*3/);
@@ -1744,12 +1782,11 @@
         box.innerHTML = `<p class="text-sm text-rose-600 text-center py-4">과제를 불러오지 못했습니다. 🔄 새로고침을 눌러주세요.</p>`;
         return;
       }
-      const todayStr = getKSTDateString();
-      coreAssignments = (data || []).sort((a, b) => {
-        const ap = a.결과 === "진행중" ? 0 : 1;
-        const bp = b.결과 === "진행중" ? 0 : 1;
+      const order = { open: 0, late: 1, done: 2, lateDone: 2, failed: 3, closed: 3 };
+      coreAssignments = (data || []).map(r => ({ ...r, _ph: corePhase(r) })).sort((a, b) => {
+        const ap = order[a._ph.phase], bp = order[b._ph.phase];
         if (ap !== bp) return ap - bp;
-        return ap === 0
+        return ap <= 1
           ? String(a.날짜).localeCompare(String(b.날짜))
           : String(b.날짜).localeCompare(String(a.날짜));
       });
@@ -1763,27 +1800,29 @@
         const title = coreTitleOf(row);
         const tries = parseCoreAttempt(row.선생님메모);
         const deadline = String(row.날짜 || "");
-        const isOpen = row.결과 === "진행중";
-        const isLate = isOpen && deadline && deadline < todayStr;
-        const dday = deadline ? getDaysDiff(deadline, todayStr) : null;
+        const ph = row._ph;
         let badge, action = "";
-        if (row.결과 === "제출") {
+        if (ph.phase === "done") {
           badge = `<span class="text-[11px] font-extrabold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">✅ 통과</span>`;
-        } else if (row.결과 === "미제출") {
+        } else if (ph.phase === "lateDone") {
+          badge = `<span class="text-[11px] font-extrabold px-2 py-0.5 rounded bg-amber-100 text-amber-800">🐢 지각 통과 (포인트 절반)</span>`;
+        } else if (ph.phase === "failed") {
           badge = `<span class="text-[11px] font-extrabold px-2 py-0.5 rounded bg-slate-200 text-slate-700">미통과 종료</span>`;
-        } else if (isLate) {
-          badge = `<span class="text-[11px] font-extrabold px-2 py-0.5 rounded bg-slate-200 text-slate-700">⌛ 마감 지남</span>`;
+        } else if (ph.phase === "closed") {
+          badge = `<span class="text-[11px] font-extrabold px-2 py-0.5 rounded bg-slate-200 text-slate-700">⌛ 제출 기간 끝</span>`;
+        } else if (ph.phase === "late") {
+          badge = `<span class="text-[11px] font-extrabold px-2 py-0.5 rounded bg-amber-100 text-amber-800">⏰ 마감 지남 · 늦게 내기 가능 (포인트 절반, ${ph.daysLeft <= 0 ? "오늘 밤 10시까지" : ph.daysLeft + "일 남음"})</span>`;
+          action = `<button onclick="startCoreQuiz(${i})" class="shrink-0 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-sm">▶ 늦게 도전 (${tries + 1}번째)</button>`;
         } else {
-          badge = `<span class="text-[11px] font-extrabold px-2 py-0.5 rounded bg-rose-100 text-rose-700">진행중 · ${dday === 0 ? "오늘 마감" : "D-" + dday}</span>`;
-          if (tries < CORE_MAX_TRIES) {
-            action = `<button onclick="startCoreQuiz(${i})" class="shrink-0 bg-indigo-700 hover:bg-indigo-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-sm">▶ ${tries + 1}번째 도전</button>`;
-          }
+          badge = `<span class="text-[11px] font-extrabold px-2 py-0.5 rounded bg-rose-100 text-rose-700">진행중 · ${ph.dday <= 0 ? "오늘 밤 10시 마감" : "D-" + ph.dday}</span>`;
+          action = `<button onclick="startCoreQuiz(${i})" class="shrink-0 bg-indigo-700 hover:bg-indigo-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-sm">▶ ${tries + 1}번째 도전</button>`;
         }
+        const isActive = ph.phase === "open" || ph.phase === "late";
         return `
-          <div class="flex items-center justify-between gap-2 border border-slate-200 rounded-lg px-3 py-2.5 ${isOpen && !isLate ? "bg-white" : "bg-slate-50"}">
+          <div class="flex items-center justify-between gap-2 border border-slate-200 rounded-lg px-3 py-2.5 ${isActive ? "bg-white" : "bg-slate-50"}">
             <div class="min-w-0">
               <p class="text-sm font-bold text-slate-900 break-keep">${escapeHtml(title)}</p>
-              <p class="text-[11px] text-slate-500 mt-0.5">마감 ${escapeHtml(deadline)} · 도전 ${tries}/${CORE_MAX_TRIES} ${row.선생님메모 && row.선생님메모.includes("점") ? "· " + escapeHtml(String(row.선생님메모).split("·").slice(1).join("·").trim()) : ""}</p>
+              <p class="text-[11px] text-slate-500 mt-0.5">마감 ${escapeHtml(deadline)} 밤 10시 · 도전 ${tries}/${CORE_MAX_TRIES} ${row.선생님메모 && row.선생님메모.includes("점") ? "· " + escapeHtml(String(row.선생님메모).split("·").slice(1).join("·").trim()) : ""}</p>
               <div class="mt-1">${badge}</div>
             </div>
             ${action}
@@ -1795,6 +1834,12 @@
       markUserInteraction();
       const row = coreAssignments[idx];
       if (!row) return;
+      const ph0 = corePhase(row);
+      if (ph0.phase !== "open" && ph0.phase !== "late") {
+        alert("이 과제는 지금 풀 수 없어요. 목록을 새로고침합니다.");
+        loadCoreAssignments();
+        return;
+      }
       const title = coreTitleOf(row);
       const { data, error } = await db.from("wordbook").select("분류, 영어단어, 예문").like("분류", "[CORE문제은행]%").eq("영어단어", title);
       if (error || !data || !data.length) {
@@ -1834,7 +1879,7 @@
       }
 
       questions.forEach(q => { q.sel = null; });
-      coreActive = { row, title, tries: parseCoreAttempt(row.선생님메모), questions };
+      coreActive = { row, title, tries: parseCoreAttempt(row.선생님메모), questions, late: ph0.phase === "late" };
       renderCoreQuiz();
     }
 
@@ -1849,6 +1894,7 @@
         <div class="bg-indigo-900 text-white p-3.5 rounded-xl sticky top-[104px] z-20 flex items-center justify-between shadow-lg">
           <div class="min-w-0">
             <span class="text-[11px] font-extrabold px-2 py-0.5 rounded bg-amber-400 text-slate-900 mr-1">${qa.tries + 1}번째 도전</span>
+            ${qa.late ? `<span class="text-[11px] font-extrabold px-2 py-0.5 rounded bg-rose-500 text-white mr-1">지각 제출 · 포인트 절반</span>` : ""}
             <span class="text-xs md:text-sm font-bold">${escapeHtml(qa.title)}</span>
             <span id="coreProgress" class="ml-2 text-xs text-emerald-300 font-bold"></span>
           </div>
@@ -1941,15 +1987,17 @@
 
         // 최신 상태 다시 확인 (다른 기기에서 이미 제출했는지)
         const { data: fresh, error: fErr } = await db.from("assignments").select("*")
-          .eq("이름", qa.row.이름).eq("과제명", qa.row.과제명).eq("결과", "진행중");
+          .eq("이름", qa.row.이름).eq("과제명", qa.row.과제명).in("결과", ["진행중", "미제출"]);
         if (fErr) throw fErr;
-        const liveRow = (fresh || [])[0];
+        const cands = (fresh || []).filter(r => ["open", "late"].includes(corePhase(r).phase));
+        const liveRow = cands.find(r => String(r.날짜) === String(qa.row.날짜)) || cands[0];
         if (!liveRow) {
-          alert("이 과제는 이미 처리가 끝났어요. 목록을 새로고침합니다.");
+          alert("이 과제는 이미 처리가 끝났거나 제출 기간이 지났어요. 목록을 새로고침합니다.");
           coreActive = null;
           cancelCoreQuiz();
           return;
         }
+        const isLateNow = corePhase(liveRow).phase === "late";
         const tryNo = parseCoreAttempt(liveRow.선생님메모) + 1;
         if (tryNo > CORE_MAX_TRIES) {
           alert("도전 횟수(3번)를 모두 사용했어요.");
@@ -1960,7 +2008,9 @@
 
         let update;
         if (passed) {
-          update = { 결과: "제출", 선생님메모: `시도:${tryNo}/3 · ${score}점 통과` };
+          update = isLateNow
+            ? { 결과: "지각제출", 선생님메모: `시도:${tryNo}/3 · ${score}점 지각 통과` }
+            : { 결과: "제출", 선생님메모: `시도:${tryNo}/3 · ${score}점 통과` };
         } else if (tryNo >= CORE_MAX_TRIES) {
           update = { 결과: "미제출", 선생님메모: `시도:${tryNo}/3 · 최종 미통과 (${score}점)` };
         } else {
@@ -1971,21 +2021,26 @@
         if (liveRow.id !== undefined && liveRow.id !== null) {
           uq = uq.eq("id", liveRow.id);
         } else {
-          uq = uq.eq("이름", liveRow.이름).eq("과제명", liveRow.과제명).eq("결과", "진행중");
+          uq = uq.eq("이름", liveRow.이름).eq("과제명", liveRow.과제명).eq("날짜", liveRow.날짜).eq("결과", liveRow.결과);
         }
         const { error: uErr } = await uq;
         if (uErr) throw uErr;
 
         let pointMsg = "";
         if (passed) {
-          const pts = CORE_POINTS_BY_TRY[tryNo - 1] || 0;
-          const reason = `CORE 과제 통과 (${qa.title})`;
-          const { data: dup } = await db.from("points").select("내역").eq("이름", liveRow.이름).eq("내역", reason);
+          const basePts = CORE_POINTS_BY_TRY[tryNo - 1] || 0;
+          const pts = isLateNow ? basePts / 2 : basePts;
+          const reasonOn = `CORE 과제 통과 (${qa.title})`;
+          const reasonLate = `CORE 과제 지각통과 (${qa.title})`;
+          const reason = isLateNow ? reasonLate : reasonOn;
+          const { data: dup } = await db.from("points").select("내역").eq("이름", liveRow.이름).in("내역", [reasonOn, reasonLate]);
           if (pts > 0 && !(dup && dup.length)) {
             await safeInsert("points", { 날짜: todayStr, 이름: liveRow.이름, 내역: reason, 포인트증감: String(pts) });
             if (!pointsSummary[liveRow.이름]) pointsSummary[liveRow.이름] = { total: 0, mins: 0, days: 0 };
             pointsSummary[liveRow.이름].total += pts;
-            pointMsg = `✨ ${tryNo}번째 도전 통과! 장학금 +${pts}P를 받았어요!`;
+            pointMsg = isLateNow
+              ? `🐢 ${tryNo}번째 도전 통과! 마감 후 제출이라 장학금은 절반인 +${pts}P예요. 다음엔 마감 전에!`
+              : `✨ ${tryNo}번째 도전 통과! 장학금 +${pts}P를 받았어요!`;
           }
           confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
         } else if (tryNo >= CORE_MAX_TRIES) {
