@@ -906,15 +906,19 @@
         grouped[pr].push(row);
       });
 
+      // 밀린 재시: 미통과·미응시 이후(같은 날 포함)에 그 범위(또는 그 범위를 덮는 범위)를 통과했으면 해결된 것으로 봄
+      const isPassRes = r => String(r || "").includes("통과") && !String(r || "").includes("미통과");
+      const rngOf = pr => { const m = String(pr).match(/^(.+?)\s+(\d+)\s*~\s*(\d+)번$/); return m ? { c: m[1].trim(), s: +m[2], e: +m[3] } : null; };
+      const covers = (pp, fp) => { if (pp === fp) return true; const a = rngOf(pp), b = rngOf(fp); return !!(a && b && a.c === b.c && a.s <= b.s && a.e >= b.e); };
+      const passes = myVocabTests.filter(v => isPassRes(v.결과)).map(v => ({ d: String(v.날짜), pr: extractPureRange(v.비고) })).filter(x => x.pr);
       myRetakes = [];
       Object.keys(grouped).forEach(pr => {
         const list = grouped[pr];
-        list.sort((a, b) => String(a.날짜).localeCompare(String(b.날짜)));
-        const lastExam = list[list.length - 1];
-        const resStr = String(lastExam.결과 || "");
-        if (resStr.includes("미통과") || resStr.includes("미응시")) {
-          myRetakes.push({ range: pr, date: lastExam.날짜, count: list.length });
-        }
+        const fails = list.filter(v => String(v.결과 || "").includes("미통과") || String(v.결과 || "").includes("미응시"));
+        if (!fails.length) return;
+        const lastFail = fails.map(v => String(v.날짜)).sort().pop();
+        if (passes.some(p => p.d >= lastFail && covers(p.pr, pr))) return;
+        myRetakes.push({ range: pr, date: lastFail, count: list.length });
       });
 
       const alertsBox = document.getElementById("myAlertsText");
@@ -1151,6 +1155,7 @@
           <div class="flip-card-inner">
             <div class="flip-card-front">
               <button type="button" data-voca-key="${escapeHtml(vk)}" onclick="event.stopPropagation(); toggleFlashVoca(${wi});" class="${starClass(!!myVoca[vk])}">${myVoca[vk] ? "★ 담음" : "☆ 담기"}</button>
+              <button type="button" onclick="event.stopPropagation(); speakFlash(${wi});" class="${speakBtnClass()}" title="발음 듣기">🔊</button>
               <span class="text-[11px] text-blue-200 mb-0.5">#${w.단어번호}</span>
               <h3 class="text-xl font-extrabold tracking-wide">${escapeHtml(w.영어단어)}</h3>
               <p class="text-xs text-slate-300 mt-1">${escapeHtml(w.발음기호)}</p>
@@ -1295,6 +1300,7 @@
         card.innerHTML = `
           <div class="flip-card-inner">
             <div class="flip-card-front" style="background-color:#78350f;">
+              <button type="button" data-speak-word="${escapeHtml(v.english)}" class="${speakBtnClass()}" title="발음 듣기">🔊</button>
               <span class="absolute top-2 right-2 text-[11px] font-extrabold px-2 py-1 rounded-full bg-amber-400 text-slate-900">${cnt > 1 ? "🔥 " + cnt + "회" : "★"}</span>
               <h3 class="text-xl font-extrabold tracking-wide">${escapeHtml(v.english)}</h3>
               <p class="text-xs text-amber-100 mt-1">${escapeHtml(v.pronunciation)}</p>
@@ -1307,6 +1313,8 @@
             </div>
           </div>
         `;
+        const spBtn = card.querySelector("[data-speak-word]");
+        if (spBtn) spBtn.onclick = (ev) => { ev.stopPropagation(); markUserInteraction(); speakWord(v.english); };
         const rmBtn = card.querySelector("[data-remove-key]");
         rmBtn.onclick = (ev) => {
           ev.stopPropagation();
@@ -1319,6 +1327,40 @@
         container.appendChild(card);
       });
       container.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    // 🔊 영어 발음 듣기: 휴대폰·PC 브라우저에 들어 있는 음성 기능 사용 (인터넷 요청 없음 → 느려지지 않음)
+    let _enVoice = null;
+    function pickEnglishVoice() {
+      if (!("speechSynthesis" in window)) return null;
+      const vs = window.speechSynthesis.getVoices() || [];
+      return vs.find(v => /en[-_]US/i.test(v.lang) && /Samantha|Google|Microsoft|Aria|Jenny/i.test(v.name))
+          || vs.find(v => /en[-_]US/i.test(v.lang)) || vs.find(v => /^en/i.test(v.lang)) || null;
+    }
+    if ("speechSynthesis" in window) {
+      _enVoice = pickEnglishVoice();
+      window.speechSynthesis.onvoiceschanged = () => { _enVoice = pickEnglishVoice(); };
+    }
+    function speakBtnClass() {
+      return "absolute top-2 left-2 text-sm px-2 py-1 rounded-full shadow bg-white/20 text-white hover:bg-white/40";
+    }
+    function speakWord(text) {
+      const t = String(text || "").trim();
+      if (!t) return;
+      if (!("speechSynthesis" in window)) { alert("이 기기에서는 발음 듣기를 지원하지 않아요. (카카오톡 안에서 열었다면 크롬·사파리로 열어 주세요)"); return; }
+      try {
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(t);
+        u.lang = "en-US";
+        u.rate = 0.85;
+        if (_enVoice) u.voice = _enVoice;
+        window.speechSynthesis.speak(u);
+      } catch (e) { console.error(e); }
+    }
+    function speakFlash(idx) {
+      markUserInteraction();
+      const w = flashList[idx];
+      if (w) speakWord(w.영어단어);
     }
 
     function shuffleArray(arr) {
