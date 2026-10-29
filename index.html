@@ -2486,7 +2486,7 @@
     let peerScope = "sg";
     try { const v = localStorage.getItem("pqrs_peer_scope"); if (PEER_SCOPES.some(x => x.k === v)) peerScope = v; } catch (e) {}
 
-    const EMPTY_PEER = () => ({ w_n: 0, w_p: 0, w_m: 0, h_n: 0, h_d: 0, c_n: 0, c_d: 0, a_n: 0, a_p: 0, pts: 0, mins: 0, days: 0 });
+    const EMPTY_PEER = () => ({ w_n: 0, w_p: 0, w_m: 0, k_n: 0, k_p: 0, h_n: 0, h_d: 0, c_n: 0, c_d: 0, a_n: 0, a_p: 0, pts: 0, mins: 0, days: 0 });
     const PEER_METRICS = [
       { k: "word", icon: "📖", label: "단어 본시험 통과율", rate: true, get: o => o.w_n ? o.w_p / o.w_n : null, sub: o => `본시험 ${o.w_n}회 중 ${o.w_p}회 통과${o.w_m ? ` · 미응시 ${o.w_m}회 포함` : ""} (재시험 제외)`,
         up: "빠지지 말고 시험을 보고, 암기장으로 한 번 더 외워 한 번에 통과해 봐요!", none: "최근 30일 본시험 기록이 없어요" },
@@ -2494,6 +2494,8 @@
         up: "마감(밤 10시) 전에 내요. 늦게라도 내면 절반 포인트!", none: "최근 30일 마감된 과제가 없어요" },
       { k: "core", icon: "📝", label: "CORE 과제 제출율", rate: true, get: o => o.c_n ? o.c_d / o.c_n : null, sub: o => `${o.c_n}건 중 ${o.c_d}건 통과`,
         up: "마감 후 7일 안에는 늦게라도 풀 수 있어요!", none: "최근 30일 마감된 CORE 과제가 없어요" },
+      { k: "clinic", icon: "🏥", label: "클리닉 통과율", rate: true, get: o => o.k_n ? o.k_p / o.k_n : null, sub: o => `클리닉 ${o.k_n}회 중 ${o.k_p}회 통과 (면제 제외)`,
+        up: "클리닉에 빠지지 말고, 준비해 와서 한 번에 통과해요!", none: "최근 30일 클리닉 기록이 없어요" },
       { k: "att", icon: "📅", label: "출석률", rate: true, get: o => o.a_n ? o.a_p / o.a_n : null, sub: o => `${o.a_n}번 수업 중 ${o.a_p}번 참석`,
         up: "빠진 날은 보충으로 채우면 결석이 되지 않아요.", none: "최근 30일 출결 기록이 없어요" },
       { k: "pts", icon: "💎", label: "받은 포인트", rate: false, get: o => o.pts, sub: () => "장학금 차감 전, 새로 받은 포인트",
@@ -2553,7 +2555,10 @@
     }
 
     async function loadPeerData(stInfo) {
-      const res = await db.from("peer_stats_30d").select("*");
+      const [res, cli] = await Promise.all([
+        db.from("peer_stats_30d").select("*"),
+        db.from("clinic_stats_30d").select("*")
+      ]);
       if (!res.error && Array.isArray(res.data)) {
         const cur = {}, prev = {};
         res.data.forEach(r => {
@@ -2562,13 +2567,21 @@
           Object.keys(o).forEach(c => { o[c] = toNum(r[c]); });
           tgt[r.이름] = o;
         });
-        return { cur, prev, full: true };
+        const hasClinic = !cli.error && Array.isArray(cli.data);
+        if (hasClinic) {
+          cli.data.forEach(r => {
+            const tgt = Number(r.win) === 1 ? prev : cur;
+            const o = tgt[r.이름] || (tgt[r.이름] = EMPTY_PEER());
+            o.k_n = toNum(r.k_n); o.k_p = toNum(r.k_p);
+          });
+        }
+        return { cur, prev, full: true, hasClinic };
       }
       console.warn("peer_stats_30d 요약 뷰가 없어 우리 학교·학년 기록으로 계산합니다.", res.error);
       const today = getKSTDateString();
       const since = addDaysStr(today, -PEER_DAYS);
       const names = peerMembers(stInfo, "sg");
-      if (!names.length) return { cur: {}, prev: null, full: false };
+      if (!names.length) return { cur: {}, prev: null, full: false, hasClinic: false };
       const q = (tbl, cols) => fetchPaged(() => db.from(tbl).select(cols).in("이름", names).gt("날짜", since).lte("날짜", today).order("id"));
       const [t, h, a, p] = await Promise.all([
         q("vocab_tests", "날짜, 이름, 결과, 비고"),
@@ -2577,7 +2590,7 @@
         q("points", "날짜, 이름, 내역, 포인트증감")
       ]);
       if (t.error && h.error && a.error && p.error) throw t.error;
-      return { cur: computePeerRaw(names, { tests: t.data || [], hw: h.data || [], att: a.data || [], pts: p.data || [] }, today, since), prev: null, full: false };
+      return { cur: computePeerRaw(names, { tests: t.data || [], hw: h.data || [], att: a.data || [], pts: p.data || [] }, today, since), prev: null, full: false, hasClinic: false };
     }
 
     // 받침 있으면 '과', 없으면 '와'
@@ -2585,6 +2598,70 @@
       const c = String(word || "").charCodeAt(String(word || "").length - 1);
       if (c >= 0xAC00 && c <= 0xD7A3) return (c - 0xAC00) % 28 ? "과" : "와";
       return "와";
+    }
+
+    // 이름 가운데 글자 가리기: 홍길동 → 홍*동, 김민 → 김*, 남궁민수 → 남**수
+    function maskName(nm) {
+      const c = Array.from(String(nm || ""));
+      if (c.length <= 1) return c.join("");
+      if (c.length === 2) return c[0] + "*";
+      return c[0] + "*".repeat(c.length - 2) + c[c.length - 1];
+    }
+
+    // 🏆 항목별 TOP 10 (고른 범위 안에서)
+    const PEER_TOP_N = 10;
+    const PEER_TOP_MIN = 3;   // 비율 항목은 기록 3회 이상인 학생만 (1번 보고 100%가 1등 되는 것 방지)
+    let peerTopMetric = "word";
+    try { const v = localStorage.getItem("pqrs_peer_top"); if (v) peerTopMetric = v; } catch (e) {}
+    const denOf = (d, o) => ({ word: o.w_n, hw: o.h_n, core: o.c_n, clinic: o.k_n, att: o.a_n })[d.k] || 0;
+
+    function setPeerTop(k) {
+      peerTopMetric = k;
+      try { localStorage.setItem("pqrs_peer_top", k); } catch (e) {}
+      if (myData && peerCache.data) document.getElementById("myPosition").innerHTML = peerHtml(myData.stInfo, peerCache.data);
+    }
+
+    function peerTopHtml(stInfo, data, scope, metrics) {
+      if (!data.full && scope !== "sg") return "";
+      const d = metrics.find(x => x.k === peerTopMetric) || metrics[0];
+      const fmt = d.fmt || (v => `${Math.round(v * 100)}%`);
+      const chips = metrics.map(x => `<button onclick="setPeerTop('${x.k}')" class="text-[11px] font-bold px-2 py-1 rounded-full border ${x.k === d.k ? "bg-amber-500 text-white border-amber-500" : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"}">${x.icon} ${x.label.replace(" 통과율", "").replace(" 제출율", "")}</button>`).join("");
+      const rows = peerMembers(stInfo, scope).map(n => {
+        const o = data.cur[n] || EMPTY_PEER();
+        const v = d.get(o);
+        return { n, v, den: denOf(d, o), o };
+      }).filter(x => x.v !== null && (d.rate ? x.den >= PEER_TOP_MIN : x.v > 0));
+      rows.sort((a, b) => (b.v - a.v) || (b.den - a.den));
+      rows.forEach((x, i) => { x.rank = i && Math.abs(rows[i - 1].v - x.v) < 1e-9 ? rows[i - 1].rank : i + 1; });
+      const sObj = PEER_SCOPES.find(x => x.k === scope);
+      let body;
+      if (rows.length < PEER_MIN_OTHERS + 1) {
+        body = `<p class="text-xs text-slate-500 px-1 py-2">순위를 만들 만큼 기록이 아직 적어요.</p>`;
+      } else {
+        const top = rows.filter(x => x.rank <= PEER_TOP_N).slice(0, PEER_TOP_N + 5);
+        const medal = r => r === 1 ? "🥇" : r === 2 ? "🥈" : r === 3 ? "🥉" : `${r}`;
+        body = `<div class="divide-y divide-slate-100 border border-slate-200 rounded-lg text-xs">` + top.map(x => {
+          const me = x.n === currentStudent;
+          return `<div class="flex items-center gap-2 px-2.5 py-1.5 ${me ? "bg-blue-50 font-bold" : ""}">
+            <span class="w-7 shrink-0 text-center ${x.rank <= 3 ? "text-base" : "text-slate-500 font-bold"}">${medal(x.rank)}</span>
+            <span class="flex-1 text-slate-800">${escapeHtml(maskName(x.n))}${me ? ' <span class="text-blue-700">(나)</span>' : ""}</span>
+            <span class="text-[10px] text-slate-400">${d.rate ? `${x.den}회` : ""}</span>
+            <span class="w-16 text-right font-bold text-slate-900">${fmt(x.v)}</span></div>`;
+        }).join("") + `</div>`;
+        const mine = rows.find(x => x.n === currentStudent);
+        if (!top.some(x => x.n === currentStudent)) {
+          const meO = data.cur[currentStudent] || EMPTY_PEER();
+          const myV = d.get(meO);
+          body += `<p class="text-xs text-slate-600 mt-1.5 px-1">${mine ? `나는 <b>${mine.rank}등</b> (${fmt(mine.v)}) · TOP ${PEER_TOP_N}까지 조금만 더!`
+            : myV === null || (!d.rate && myV <= 0) ? "아직 이 항목 기록이 없어요." : `기록이 ${PEER_TOP_MIN}회 이상이면 순위에 들어가요 (지금 ${denOf(d, meO)}회).`}</p>`;
+        }
+      }
+      return `<div class="mt-3 border-t border-slate-200 pt-3">
+        <p class="text-sm font-bold text-slate-800 mb-1">🏆 항목별 TOP ${PEER_TOP_N} <span class="text-xs font-normal text-slate-500">· ${sObj.label} · 최근 ${PEER_DAYS}일</span></p>
+        <div class="flex flex-wrap gap-1 mb-2">${chips}</div>
+        ${body}
+        <p class="text-[10px] text-slate-400 mt-1">이름 가운데 글자는 가려져요${d.rate ? ` · 비율 항목은 기록 ${PEER_TOP_MIN}회 이상인 친구만` : ""}</p>
+      </div>`;
     }
 
     function setPeerScope(k) {
@@ -2654,7 +2731,8 @@
       }).join("");
 
       // 요약 (선택한 범위 기준 + 지난 30일 대비 나의 변화)
-      const cmp = PEER_METRICS.map(d => ({ d, c: peerCompare(d, data, scope, stInfo), ch: peerChange(d, data) }));
+      const metrics = PEER_METRICS.filter(d => d.k !== "clinic" || data.hasClinic);
+      const cmp = metrics.map(d => ({ d, c: peerCompare(d, data, scope, stInfo), ch: peerChange(d, data) }));
       const comparable = cmp.filter(x => x.c.rank);
       const parts = [];
       if (comparable.length) {
@@ -2677,7 +2755,7 @@
         : `<b class="${c.rank <= Math.ceil(c.n / 3) ? "text-emerald-700" : c.rank > c.n - Math.ceil(c.n / 3) ? "text-rose-600" : "text-slate-700"}">${c.rank}</b><span class="text-slate-400">/${c.n}</span>`;
       const table = `<div class="overflow-x-auto mb-2"><table class="w-full text-[11px] border border-slate-200 rounded-lg">
         <thead><tr class="bg-slate-50 text-slate-600"><th class="text-left font-bold px-2 py-1.5">내 순위</th>${PEER_SCOPES.map(x => `<th class="font-bold px-1 py-1.5 whitespace-nowrap ${x.k === scope ? "text-blue-900 bg-blue-50" : ""}">${x.short}</th>`).join("")}</tr></thead>
-        <tbody>${PEER_METRICS.map(d => `<tr class="border-t border-slate-100"><td class="px-2 py-1.5 text-slate-700 whitespace-nowrap">${d.icon} ${d.label}</td>${PEER_SCOPES.map(x => `<td class="text-center px-1 py-1.5 ${x.k === scope ? "bg-blue-50" : ""}">${cell(peerCompare(d, data, x.k, stInfo))}</td>`).join("")}</tr>`).join("")}</tbody></table>
+        <tbody>${metrics.map(d => `<tr class="border-t border-slate-100"><td class="px-2 py-1.5 text-slate-700 whitespace-nowrap">${d.icon} ${d.label}</td>${PEER_SCOPES.map(x => `<td class="text-center px-1 py-1.5 ${x.k === scope ? "bg-blue-50" : ""}">${cell(peerCompare(d, data, x.k, stInfo))}</td>`).join("")}</tr>`).join("")}</tbody></table>
         <p class="text-[10px] text-slate-400 mt-1">숫자 = 등수/비교 인원 · "-" = 기록이 없거나 비교할 친구가 적음${data.full ? "" : " · 다른 범위 비교는 선생님이 업데이트를 적용하면 보여요"}</p></div>`;
 
       // 항목 카드 (선택한 범위)
@@ -2712,7 +2790,8 @@
         ${summary}
         ${table}
         <p class="text-xs font-bold text-slate-600 mb-1">${sObj.label}${josaWa(sObj.label)} 비교</p>
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">${cards.join("")}</div>`;
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">${cards.join("")}</div>
+        ${peerTopHtml(stInfo, data, scope, metrics)}`;
     }
 
     function renderMyOverview() {
