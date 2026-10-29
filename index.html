@@ -2486,10 +2486,10 @@
     let peerScope = "sg";
     try { const v = localStorage.getItem("pqrs_peer_scope"); if (PEER_SCOPES.some(x => x.k === v)) peerScope = v; } catch (e) {}
 
-    const EMPTY_PEER = () => ({ w_n: 0, w_p: 0, h_n: 0, h_d: 0, c_n: 0, c_d: 0, a_n: 0, a_p: 0, pts: 0, mins: 0, days: 0 });
+    const EMPTY_PEER = () => ({ w_n: 0, w_p: 0, w_m: 0, h_n: 0, h_d: 0, c_n: 0, c_d: 0, a_n: 0, a_p: 0, pts: 0, mins: 0, days: 0 });
     const PEER_METRICS = [
-      { k: "word", icon: "📖", label: "단어 본시험 통과율", rate: true, get: o => o.w_n ? o.w_p / o.w_n : null, sub: o => `본시험 ${o.w_n}회 중 ${o.w_p}회 통과 (재시험·미응시 제외)`,
-        up: "시험 전에 암기장으로 한 번 더 보고, 한 번에 통과해 봐요!", none: "최근 30일 본시험 기록이 없어요" },
+      { k: "word", icon: "📖", label: "단어 본시험 통과율", rate: true, get: o => o.w_n ? o.w_p / o.w_n : null, sub: o => `본시험 ${o.w_n}회 중 ${o.w_p}회 통과${o.w_m ? ` · 미응시 ${o.w_m}회 포함` : ""} (재시험 제외)`,
+        up: "빠지지 말고 시험을 보고, 암기장으로 한 번 더 외워 한 번에 통과해 봐요!", none: "최근 30일 본시험 기록이 없어요" },
       { k: "hw", icon: "📚", label: "일반 과제 제출율", rate: true, get: o => o.h_n ? o.h_d / o.h_n : null, sub: o => `${o.h_n}건 중 ${o.h_d}건 제출`,
         up: "마감(밤 10시) 전에 내요. 늦게라도 내면 절반 포인트!", none: "최근 30일 마감된 과제가 없어요" },
       { k: "core", icon: "📝", label: "CORE 과제 제출율", rate: true, get: o => o.c_n ? o.c_d / o.c_n : null, sub: o => `${o.c_n}건 중 ${o.c_d}건 통과`,
@@ -2516,9 +2516,10 @@
       const inWin = d => { const x = String(d || "").slice(0, 10); return x > since && x <= today; };
       (rows.tests || []).forEach(t => {
         const o = st[t.이름]; if (!o || !inWin(t.날짜)) return;
-        // 본시험만 (예전 형식처럼 번호가 없는 기록도 포함) · 재시험·미응시 기록은 제외
-        if (!String(t.비고 || "").trim().startsWith("[본시험]") || String(t.결과 || "").startsWith("미응시")) return;
+        // 본시험만 (예전 형식처럼 번호가 없는 기록도 포함) · 미응시도 미통과로 셈 · 재시험 기록은 제외
+        if (!String(t.비고 || "").trim().startsWith("[본시험]")) return;
         o.w_n += 1;
+        if (String(t.결과 || "").startsWith("미응시")) o.w_m += 1;
         if (String(t.결과 || "").includes("통과") && !String(t.결과 || "").includes("미통과")) o.w_p += 1;
       });
       (rows.hw || []).forEach(h => {
