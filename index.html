@@ -617,9 +617,12 @@
       return name[0] + "*".repeat(name.length - 2) + name[name.length - 1];
     }
 
+    // '[본시험] 제일2기말(선) 1~50번 (5분)' → '제일2기말(선) 1~50번' (단어장 이름에 괄호가 있어도 번호까지 읽음)
     function extractPureRange(text) {
       if (!text || typeof text !== 'string') return "";
       try {
+        const m = text.match(/^\s*(?:\[[^\]]*\]\s*)?(.+?\d+\s*~\s*\d+\s*번)/);
+        if (m) return m[1].trim();
         if (text.includes(']')) return text.split(']')[1].split('(')[0].trim();
         return text.split('(')[0].trim();
       } catch (e) { return text; }
@@ -2291,7 +2294,8 @@
     const CONTINUE_WORD_JS = "이어서";
     // '점단어 101~200번 / 선단어 이어서' → [{cat, s, e}, {cat, cont:true}]
     function parsePlanWords(txt) {
-      return String(txt || "").split("/").map(x => x.trim()).filter(Boolean).map(part => {
+      // 단어장 이름 괄호 안의 '/'(예: 제일2기말(유/반))는 구분자로 보지 않음
+      return String(txt || "").split(/\/(?![^()]*\))/).map(x => x.trim()).filter(Boolean).map(part => {
         let m = part.match(/^(.+?)\s+(\d+)\s*~\s*(\d+)\s*번?$/);
         if (m) return { cat: m[1].trim(), s: parseInt(m[2], 10), e: parseInt(m[3], 10) };
         m = part.match(/^(.+?)\s+이어서$/);
