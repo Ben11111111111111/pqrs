@@ -30,6 +30,18 @@
     .pq-seg { display: flex; gap: 4px; background: #e2e8f0; padding: 4px; border-radius: 14px; }
     .pq-seg button { flex: 1; padding: 9px 6px; border-radius: 10px; font-size: 13px; font-weight: 800; color: #475569; transition: all .15s; }
     .pq-seg button.on { background: #fff; color: #0f172a; box-shadow: 0 1px 3px rgba(15,23,42,.15); }
+    .pq-opt { width: 100%; text-align: left; background: #fff; border: 2px solid #e2e8f0; border-radius: 16px; padding: 14px 16px; font-size: 15px; font-weight: 700; color: #0f172a; transition: transform .08s, background .15s, border-color .15s; }
+    .pq-opt:active { transform: scale(.98); }
+    .pq-opt.ok { background: #dcfce7; border-color: #22c55e; }
+    .pq-opt.bad { background: #ffe4e6; border-color: #f43f5e; }
+    .pq-mc { min-height: 64px; background: #fff; border: 2px solid #e2e8f0; border-radius: 14px; padding: 8px; font-size: 13px; font-weight: 700; color: #0f172a; display: flex; align-items: center; justify-content: center; text-align: center; transition: all .15s; word-break: keep-all; }
+    .pq-mc.en { background: #eef2ff; color: #1e3a8a; border-color: #c7d2fe; font-size: 14px; }
+    .pq-mc.sel { border-color: #f59e0b; background: #fef3c7; color: #0f172a; }
+    .pq-mc.gone { visibility: hidden; }
+    .pq-mc.bad { border-color: #f43f5e; background: #ffe4e6; animation: pqShake .3s; }
+    @keyframes pqShake { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+    @keyframes pqPop { 0% { transform: scale(.6); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+    .pq-pop { animation: pqPop .35s ease-out; }
     .pq-tile { background: #f8fafc; border-radius: 16px; padding: 12px 14px; }
     @keyframes pqRing { from { stroke-dashoffset: var(--len); } }
     .pq-ring { animation: pqRing 0.9s ease-out; }
@@ -224,7 +236,11 @@
 
     <!-- 탭 1: 단어 암기장 -->
     <section id="tabContent_flash" class="hidden space-y-4">
-      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+      <div id="flashModeSeg" class="pq-seg">
+        <button id="flashModeBtn_card" class="on" onclick="switchFlashMode('card')">📇 카드 암기</button>
+        <button id="flashModeBtn_game" onclick="switchFlashMode('game')">🎮 단어 게임</button>
+      </div>
+      <div id="flashRangeBox" class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
         <div class="flex items-center justify-between mb-3">
           <h2 class="text-base font-bold text-slate-800">📇 스마트 단어 암기장</h2>
           <button onclick="forceRefreshWordbook()" class="text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold px-2.5 py-1 rounded border border-slate-300">🔄 단어장 새로고침</button>
@@ -243,13 +259,19 @@
             <input type="number" id="flashEnd" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
           </div>
         </div>
+        <div id="flashCardBtns">
         <button onclick="renderFlashcards()" class="mt-3 w-full bg-blue-900 hover:bg-blue-800 text-white font-bold py-2.5 rounded-lg text-sm transition">✨ 암기 시작! (공부시간 자동 측정)</button>
         <button id="myVocaBtn" onclick="renderMyVocaCards()" class="mt-2 w-full bg-amber-400 hover:bg-amber-500 text-slate-900 font-extrabold py-2.5 rounded-lg text-sm transition">⭐ 나만의 단어장 (0개)</button>
         <p class="text-[11px] text-slate-500 mt-1.5 text-center">카드의 ☆ 담기를 누르거나, 단어시험에서 틀린 단어는 자동으로 여기에 저장돼요.</p>
+        </div>
+        <p id="gameRangeHint" class="hidden text-[11px] text-slate-500 mt-2">🎮 위에서 고른 단어장·번호 범위의 단어로 게임을 해요. (이벤트는 선생님이 정한 범위)</p>
       </div>
 
+      <div id="flashCardArea" class="space-y-4">
       <p id="flashGuide" class="hidden text-xs text-center text-blue-800 bg-blue-50 py-2 rounded-lg font-medium">💡 카드를 터치하며 공부하면 1분마다 나의 누적 공부시간이 자동으로 기록됩니다!</p>
       <div id="flashcardsContainer" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5"></div>
+      </div>
+      <div id="gameArea" class="hidden space-y-3"></div>
     </section>
 
     <!-- 탭 3: CORE 주간과제 퀴즈 -->
@@ -850,6 +872,7 @@
     }
 
     async function onStudentChange() {
+      if (G) { stopGameTimers(); G = null; showGameChrome(true); }
       const selected = document.getElementById("studentSelect").value;
       currentStudent = selected;
       unsavedStudySeconds = 0;
@@ -974,6 +997,12 @@
       myData = { name: stName, stInfo, pts: myPtData, att: attData, hw: hwAll, tests: myVocabTests, plans: wkRes.data || [] };
       if (currentTab === "my") renderMyOverview();
       if (currentTab === "rank" && rankSubMode === "me") renderPeerBox(stInfo);
+      // 게임 이벤트 알림용 (작은 요약표 4개, 1분 동안 다시 안 받음)
+      loadGameData().then(() => {
+        if (currentStudent !== stName) return;
+        if (currentTab === "my") renderMyOverview();
+        if (currentTab === "flash" && flashMode === "game") renderGameHome(true);
+      });
 
       const wkBox = document.getElementById("weeklyProgressBox");
       const planRows = wkRes.data || [];
@@ -2468,6 +2497,7 @@
       if (d.startsWith("과제 제출") || d.startsWith("과제 지각제출")) return "📚 일반 과제";
       if (d.startsWith("클리닉")) return "🏥 클리닉";
       if (d.startsWith("장학금")) return "💰 장학금 받음";
+      if (d.startsWith("단어 게임")) return "🎮 단어 게임";
       return "✨ 기타";
     }
 
@@ -2978,6 +3008,14 @@
         todo.push({ cls: "bg-rose-50 border-rose-300", html: `🚨 <b>단어 재시</b>: ${escapeHtml(r.range)} <span class="text-xs text-slate-500">(${escapeHtml(r.date)})</span><br><span class="text-[11px] text-slate-600">24시간 안에 통과하면 +0.5P</span>`,
           act: () => goRetake(r.range), label: "재시 보기", color: "bg-rose-600 hover:bg-rose-700" });
       });
+      if (gameData.at) {
+        myActiveEvents().forEach(e => {
+          const joined = (gameData.eventBest || []).some(x => String(x.event_id) === String(e.id) && x.이름 === currentStudent);
+          if (joined) return;
+          todo.push({ cls: "bg-fuchsia-50 border-fuchsia-300", html: `🎯 <b>단어 게임 이벤트</b>: ${escapeHtml(e.제목)}<br><span class="text-xs text-slate-600">${escapeHtml(String(e.종료일).slice(5).replace("-", "/"))}까지 · ${escapeHtml(e.분류)} ${toNum(e.시작번호)}~${toNum(e.끝번호)}번</span>`,
+            act: () => { switchTab("flash"); switchFlashMode("game"); }, label: "참가하기", color: "bg-fuchsia-600 hover:bg-fuchsia-700" });
+        });
+      }
       const coreRows = (hw || []).filter(h => String(h.과제명 || "").startsWith("[CORE]")).map(h => ({ h, ph: corePhase(h) }));
       coreRows.filter(x => x.ph.phase === "open").sort((a, b) => String(a.h.날짜).localeCompare(String(b.h.날짜))).forEach(x => {
         todo.push({ cls: "bg-indigo-50 border-indigo-300", html: `📝 <b>CORE</b>: ${escapeHtml(coreTitleOf(x.h))}<br><span class="text-xs text-slate-600">${x.ph.dday <= 0 ? "<b class='text-rose-600'>오늘 밤 10시 마감!</b>" : `마감 ${escapeHtml(String(x.h.날짜).slice(5))} 밤 10시 (D-${x.ph.dday})`} · 도전 ${parseCoreAttempt(x.h.선생님메모)}/3</span>`,
@@ -3073,6 +3111,510 @@
       ${cat ? `<p class="text-xs text-slate-600 mt-2">📚 지금 외우는 단어장: <b>${escapeHtml(cat)}</b></p>` : ""}`;
     }
 
+
+    // =====================================================
+    // 🎮 단어 게임 (암기장 탭 안) — 타임어택 · 서바이벌 · 짝 맞추기 · 주간 리그 · 스트릭 · 선생님 이벤트
+    //  - 게임은 이미 받아 둔 단어장(allWordbook)으로만 진행 → 게임 중에는 서버 통신 없음
+    //  - 끝날 때 game_scores 에 한 줄 저장, 하루 첫 '완료' 게임만 +0.125P
+    //  - 순위·스트릭은 작은 요약표(game_week_best · game_streak · game_event_best)만 읽음 (1분 동안 다시 안 받음)
+    // =====================================================
+    const GAME_MODES = {
+      "타임어택": { icon: "⏱️", name: "타임어택", desc: "60초 동안 뜻을 최대한 많이 맞혀요 · 틀리면 -2초", unit: "개", better: "high" },
+      "서바이벌": { icon: "🔥", name: "서바이벌", desc: "한 문제에 8초 · 틀리면 끝! 최고 연속 정답", unit: "연속", better: "high" },
+      "짝맞추기": { icon: "🧩", name: "짝 맞추기", desc: "영어·뜻 카드 8쌍을 가장 빨리 · 틀리면 +1초", unit: "초", better: "low" }
+    };
+    const GAME_REWARD_P = "0.125";          // 성공한 판마다
+    const GAME_DAILY_MAX_TIMES = 8;          // 하루 최대 8판 = 1P
+    const GAME_REWARD_DESC = n => `단어 게임 성공 보상 (오늘 ${n}/${GAME_DAILY_MAX_TIMES})`;
+    const TA_SECONDS = 60, SV_SECONDS = 8, MATCH_PAIRS = 8;
+    let flashMode = "card";
+    let gameData = { at: 0, ok: false, events: [], week: [], streak: [], eventBest: [], loading: null };
+    let G = null;            // 진행 중인 게임
+    let gameLeagueMode = "타임어택", gameLeagueScope = "sg";
+    try { const v = localStorage.getItem("pqrs_game_league"); if (GAME_MODES[v]) gameLeagueMode = v; } catch (e) {}
+
+    function switchFlashMode(mode) {
+      markUserInteraction();
+      if (G && G.running && mode !== "game") { if (!confirmQuitGame()) return; }
+      flashMode = mode;
+      document.getElementById("flashModeBtn_card").classList.toggle("on", mode === "card");
+      document.getElementById("flashModeBtn_game").classList.toggle("on", mode === "game");
+      document.getElementById("flashCardArea").classList.toggle("hidden", mode !== "card");
+      document.getElementById("flashCardBtns").classList.toggle("hidden", mode !== "card");
+      document.getElementById("gameRangeHint").classList.toggle("hidden", mode !== "game");
+      document.getElementById("gameArea").classList.toggle("hidden", mode !== "game");
+      if (mode === "game") renderGameHome();
+    }
+
+    function confirmQuitGame() {
+      stopGameTimers();
+      if (G) G.running = false;
+      G = null;
+      showGameChrome(true);
+      return true;
+    }
+
+    function showGameChrome(show) {
+      ["flashModeSeg", "flashRangeBox"].forEach(id => { const el = document.getElementById(id); if (el) el.classList.toggle("hidden", !show); });
+    }
+
+    async function loadGameData(force) {
+      if (!force && gameData.at && Date.now() - gameData.at < 60000) return gameData;
+      if (gameData.loading) return gameData.loading;
+      gameData.loading = (async () => {
+        const [ev, wk, sk, eb] = await Promise.all([
+          db.from("game_events").select("*"),
+          db.from("game_week_best").select("*"),
+          db.from("game_streak").select("*"),
+          db.from("game_event_best").select("*")
+        ]);
+        const ok = !ev.error && !wk.error;
+        gameData = {
+          at: Date.now(), ok, loading: null,
+          events: ev.error ? [] : (ev.data || []),
+          week: wk.error ? [] : (wk.data || []),
+          streak: sk.error ? [] : (sk.data || []),
+          eventBest: eb.error ? [] : (eb.data || [])
+        };
+        if (!ok) console.warn("게임 기록 표가 아직 없어요 (game_setup.sql 실행 전). 게임은 할 수 있고 기록·순위만 빠집니다.", ev.error || wk.error);
+        return gameData;
+      })().catch(e => { console.warn("게임 순위 불러오기 실패", e); gameData.loading = null; gameData.at = Date.now(); gameData.ok = false; return gameData; });
+      return gameData.loading;
+    }
+
+    function myActiveEvents() {
+      const today = getKSTDateString();
+      const me = allStudents.find(s => s.이름 === currentStudent) || {};
+      return (gameData.events || []).filter(e => String(e.시작일) <= today && today <= String(e.종료일) && GAME_MODES[e.모드]
+        && (!String(e.대상학교 || "").trim() || String(e.대상학교).trim() === me.학교)
+        && (!String(e.대상학년 || "").trim() || normGrade(e.대상학년) === normGrade(me.학년)))
+        .sort((a, b) => String(a.종료일).localeCompare(String(b.종료일)));
+    }
+
+    // 오늘 받은 게임 보상 횟수 (하루 최대 8번 × 0.125P = 1P)
+    function gameRewardCountToday() {
+      const today = getKSTDateString();
+      return myData ? (myData.pts || []).filter(p => p.날짜 === today && String(p.내역 || "").startsWith("단어 게임") && parseFloat(p.포인트증감) > 0).length : 0;
+    }
+    function gameRewardClaimedToday() { return gameRewardCountToday() >= GAME_DAILY_MAX_TIMES; }
+
+    function fmtGameScore(mode, v) {
+      if (v === null || v === undefined || v === "") return "-";
+      if (mode === "짝맞추기") return `${(toNum(v) / 1000).toFixed(1)}초`;
+      return mode === "서바이벌" ? `${toNum(v)}연속` : `${toNum(v)}개`;
+    }
+
+    function myWeekBest(mode) {
+      const r = (gameData.week || []).find(x => x.이름 === currentStudent && x.모드 === mode);
+      return r ? toNum(r.best) : null;
+    }
+
+    function rankList(rows, mode) {
+      const low = GAME_MODES[mode].better === "low";
+      const list = rows.filter(r => toNum(r.best) > 0 || (!low && toNum(r.best) >= 0)).map(r => ({ n: r.이름, v: toNum(r.best), plays: toNum(r.plays) }))
+        .filter(x => low ? x.v > 0 : x.v > 0);
+      list.sort((a, b) => low ? a.v - b.v : b.v - a.v);
+      list.forEach((x, i) => { x.rank = i && list[i - 1].v === x.v ? list[i - 1].rank : i + 1; });
+      return list;
+    }
+
+    function leagueRowsHtml(list, mode, emptyTxt) {
+      if (!list.length) return `<p class="text-xs text-slate-400 py-3 text-center">${emptyTxt}</p>`;
+      const medal = r => r === 1 ? "🥇" : r === 2 ? "🥈" : r === 3 ? "🥉" : `${r}`;
+      const top = list.filter(x => x.rank <= 10).slice(0, 15);
+      let h = `<div class="divide-y divide-slate-100 border border-slate-200 rounded-xl text-xs overflow-hidden">` + top.map(x => {
+        const me = x.n === currentStudent;
+        return `<div class="flex items-center gap-2 px-3 py-2 ${me ? "bg-blue-50 font-bold" : "bg-white"}">
+          <span class="w-7 shrink-0 text-center ${x.rank <= 3 ? "text-base" : "text-slate-500 font-bold"}">${medal(x.rank)}</span>
+          <span class="flex-1 text-slate-800">${escapeHtml(maskName(x.n))}${me ? ' <span class="text-blue-700">(나)</span>' : ""}</span>
+          <span class="text-[10px] text-slate-400">${x.plays}판</span>
+          <span class="w-16 text-right font-extrabold text-slate-900 pq-num">${fmtGameScore(mode, x.v)}</span></div>`;
+      }).join("") + `</div>`;
+      const mine = list.find(x => x.n === currentStudent);
+      if (mine && !top.some(x => x.n === currentStudent)) h += `<p class="text-xs text-slate-600 mt-1.5 px-1">나는 <b>${mine.rank}등</b> (${fmtGameScore(mode, mine.v)}) · TOP 10까지 조금만 더!</p>`;
+      return h;
+    }
+
+    function setGameLeague(mode, scope) {
+      if (mode) gameLeagueMode = mode;
+      if (scope) gameLeagueScope = scope;
+      try { localStorage.setItem("pqrs_game_league", gameLeagueMode); } catch (e) {}
+      renderGameHome(true);
+    }
+
+    async function renderGameHome(skipLoad) {
+      const area = document.getElementById("gameArea");
+      if (!area || flashMode !== "game" || (G && G.running)) return;
+      showGameChrome(true);
+      if (!skipLoad) {
+        if (!gameData.at) area.innerHTML = `<div class="pq-card p-5 text-sm text-slate-400 text-center">⏳ 게임 준비 중...</div>`;
+        await loadGameData();
+        if (flashMode !== "game" || (G && G.running)) return;
+      }
+      const today = getKSTDateString();
+      const sk = (gameData.streak || []).find(x => x.이름 === currentStudent);
+      const streak = sk ? toNum(sk.streak) : 0, bestStreak = sk ? toNum(sk.best_streak) : 0, playedToday = !!(sk && (sk.played_today === true || sk.played_today === "true" || sk.last_day === today));
+      const claimed = gameRewardClaimedToday();
+      const events = myActiveEvents();
+
+      // 이벤트 배너
+      const evHtml = events.map(e => {
+        const rows = (gameData.eventBest || []).filter(x => String(x.event_id) === String(e.id));
+        const list = rankList(rows, e.모드);
+        const mine = list.find(x => x.n === currentStudent);
+        const dleft = getDaysDiff(String(e.종료일), today);
+        return `<div class="rounded-2xl p-4 text-white shadow-md" style="background:linear-gradient(135deg,#6d28d9,#db2777)">
+          <div class="flex items-start justify-between gap-2">
+            <div><p class="text-[11px] font-bold opacity-80">🎯 선생님 이벤트 · ${dleft <= 0 ? "오늘 마감!" : `D-${dleft}`} (${escapeHtml(String(e.종료일).slice(5).replace("-", "/"))}까지)</p>
+              <p class="text-lg font-black leading-tight mt-0.5">${escapeHtml(e.제목)}</p>
+              <p class="text-xs opacity-90 mt-1">${GAME_MODES[e.모드].icon} ${escapeHtml(GAME_MODES[e.모드].name)} · ${escapeHtml(e.분류)} ${toNum(e.시작번호)}~${toNum(e.끝번호)}번${String(e.보상 || "").trim() ? ` · 🎁 ${escapeHtml(e.보상)}` : ""}</p></div>
+            <button onclick="startGame('${e.모드}', ${Number(e.id)})" class="shrink-0 bg-white text-fuchsia-700 font-black text-sm px-4 py-2.5 rounded-full shadow">참가 ›</button>
+          </div>
+          <div class="mt-3 bg-white/15 rounded-xl px-3 py-2 text-xs">
+            ${mine ? `내 기록 <b>${fmtGameScore(e.모드, mine.v)}</b> · <b>${mine.rank}등</b> / ${list.length}명` : "아직 참가하지 않았어요. 지금 1등에 도전!"}
+            ${list.length ? `<span class="opacity-80"> · 1등 ${escapeHtml(maskName(list[0].n))} ${fmtGameScore(e.모드, list[0].v)}</span>` : ""}
+          </div></div>`;
+      }).join("");
+
+      // 스트릭 + 오늘의 보상
+      const status = `<div class="grid grid-cols-2 gap-2">
+        <div class="pq-card p-4"><p class="text-[11px] font-bold text-orange-500">🔥 연속 학습</p>
+          <p class="pq-num text-3xl font-black text-slate-900">${gameData.ok ? streak : "-"}<span class="text-base font-bold text-slate-400"> 일</span></p>
+          <p class="text-[11px] text-slate-500">${!gameData.ok ? "기록 준비 중" : playedToday ? `오늘 완료! · 최고 ${bestStreak}일` : streak ? `오늘 1판 하면 ${streak + 1}일!` : "오늘 1판으로 시작해요"}</p></div>
+        <div class="pq-card p-4"><p class="text-[11px] font-bold text-emerald-600">💎 오늘의 보상</p>
+          <p class="pq-num text-3xl font-black ${claimed ? "text-emerald-600" : "text-slate-900"}">${Number((gameRewardCountToday() * Number(GAME_REWARD_P)).toFixed(3))}<span class="text-base font-bold text-slate-400"> / 1P</span></p>
+          <div class="h-1.5 bg-emerald-100 rounded-full overflow-hidden my-1"><div class="h-1.5 bg-emerald-500" style="width:${Math.round(gameRewardCountToday() / GAME_DAILY_MAX_TIMES * 100)}%"></div></div>
+          <p class="text-[11px] text-slate-500">${claimed ? "✅ 오늘 최대로 받았어요!" : `성공한 판마다 +${GAME_REWARD_P}P · 하루 ${GAME_DAILY_MAX_TIMES}판까지`}</p></div>
+      </div>`;
+
+      // 모드 카드
+      const modes = Object.keys(GAME_MODES).map(m => {
+        const md = GAME_MODES[m], b = myWeekBest(m);
+        return `<button onclick="startGame('${m}')" class="pq-card p-4 text-left w-full hover:ring-2 hover:ring-blue-300 transition">
+          <div class="flex items-center gap-3">
+            <span class="text-3xl">${md.icon}</span>
+            <div class="flex-1 min-w-0"><p class="text-base font-black text-slate-900">${md.name}</p><p class="text-[11px] text-slate-500">${md.desc}</p></div>
+            <div class="text-right shrink-0"><p class="text-[10px] text-slate-400">이번 주 최고</p><p class="text-sm font-extrabold text-blue-700 pq-num">${b === null ? "-" : fmtGameScore(m, b)}</p></div>
+          </div></button>`;
+      }).join("");
+
+      // 주간 리그
+      let league = "";
+      if (gameData.ok) {
+        const me = allStudents.find(s => s.이름 === currentStudent) || {};
+        const members = new Set(peerMembers(me, gameLeagueScope));
+        const rows = (gameData.week || []).filter(x => x.모드 === gameLeagueMode && members.has(x.이름));
+        const chips = Object.keys(GAME_MODES).map(m => `<button onclick="setGameLeague('${m}')" class="text-[11px] font-bold px-2.5 py-1 rounded-full border ${m === gameLeagueMode ? "bg-amber-500 text-white border-amber-500" : "bg-white text-slate-700 border-slate-300"}">${GAME_MODES[m].icon} ${GAME_MODES[m].name}</button>`).join("");
+        const sc = [["sg", "학교·학년"], ["all", "전체"]].map(([k, l]) => `<button onclick="setGameLeague(null,'${k}')" class="text-[11px] font-bold px-2.5 py-1 rounded-full ${k === gameLeagueScope ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600"}">${l}</button>`).join("");
+        league = `<div class="pq-card p-4">
+          <div class="flex items-center justify-between mb-2"><p class="pq-h !mb-0">🏆 이번 주 리그</p><div class="flex gap-1">${sc}</div></div>
+          <p class="text-[11px] text-slate-400 mb-2">월요일마다 새로 시작 · 이름 가운데 글자는 가려져요</p>
+          <div class="flex flex-wrap gap-1 mb-2">${chips}</div>
+          ${leagueRowsHtml(rankList(rows, gameLeagueMode), gameLeagueMode, "이번 주 첫 기록의 주인공이 되어 보세요!")}
+        </div>`;
+      } else {
+        league = `<p class="text-[11px] text-slate-400 text-center">🛠️ 기록 저장·순위는 선생님이 업데이트를 적용하면 시작돼요. 게임은 지금도 할 수 있어요!</p>`;
+      }
+      area.innerHTML = evHtml + status + `<div class="space-y-2">${modes}</div>` + league;
+    }
+
+    // ---------- 게임 준비 ----------
+    function gameWordsFor(cat, s, e) {
+      return allWordbook.filter(w => w.분류 === cat && w.단어번호 >= s && w.단어번호 <= e && String(w.영어단어 || "").trim() && String(w.뜻 || "").trim());
+    }
+
+    function startGame(mode, eventId) {
+      markUserInteraction();
+      if (!currentStudent) { alert("먼저 오른쪽 위에서 내 이름을 골라 주세요."); return; }
+      let cat, s, e, ev = null;
+      if (eventId) {
+        ev = (gameData.events || []).find(x => Number(x.id) === Number(eventId));
+        if (!ev) return;
+        cat = ev.분류; s = toNum(ev.시작번호); e = toNum(ev.끝번호); mode = ev.모드;
+      } else {
+        cat = document.getElementById("flashCat").value;
+        s = parseInt(document.getElementById("flashStart").value, 10);
+        e = parseInt(document.getElementById("flashEnd").value, 10);
+      }
+      if (!cat || isNaN(s) || isNaN(e) || s > e) { alert("단어장과 번호 범위를 확인해 주세요."); return; }
+      const words = gameWordsFor(cat, s, e);
+      const need = mode === "짝맞추기" ? 4 : 4;
+      if (words.length < need) { alert(`이 범위에는 단어가 ${words.length}개뿐이에요. ${need}개 이상인 범위를 골라 주세요.${ev ? " (선생님께 알려 주세요)" : ""}`); return; }
+      const pool = allWordbook.filter(w => w.분류 === cat && String(w.뜻 || "").trim());
+      G = { mode, cat, s, e, words, pool: pool.length >= 8 ? pool : allWordbook.filter(w => String(w.뜻 || "").trim()),
+            eventId: ev ? Number(ev.id) : null, eventTitle: ev ? ev.제목 : "", running: true, student: currentStudent,
+            correct: 0, wrong: 0, combo: 0, maxCombo: 0, wrongWords: [], order: shuffleArray(words), qi: 0, timers: [] };
+      showGameChrome(false);
+      const box = document.getElementById("tabContent_flash");
+      if (box) setTimeout(() => { const hdr = document.querySelector("header"); window.scrollTo({ top: Math.max(0, box.getBoundingClientRect().top + window.scrollY - (hdr ? hdr.offsetHeight : 0) - 8), behavior: "smooth" }); }, 30);
+      if (mode === "짝맞추기") startMatch(); else startQuiz();
+    }
+
+    function stopGameTimers() {
+      if (G && G.timers) G.timers.forEach(t => { clearInterval(t); clearTimeout(t); });
+      if (G) G.timers = [];
+    }
+
+    function gameTopBar(left, right) {
+      return `<div class="flex items-center justify-between gap-2">
+        <button onclick="quitGame()" class="text-xs font-bold text-slate-500 bg-white px-3 py-2 rounded-full shadow-sm">✕ 그만하기</button>
+        <div class="text-center flex-1 min-w-0"><p class="text-[11px] font-bold text-slate-400 truncate">${G.eventId ? "🎯 " + escapeHtml(G.eventTitle) : `${escapeHtml(G.cat)} ${G.s}~${G.e}번`}</p>${left}</div>
+        <div class="text-right shrink-0 w-20">${right}</div></div>`;
+    }
+
+    function quitGame() {
+      markUserInteraction();
+      stopGameTimers();
+      G = null;
+      showGameChrome(true);
+      renderGameHome(true);
+    }
+
+    // ---------- 타임어택 · 서바이벌 (4지선다) ----------
+    function makeOptions(w) {
+      const right = String(w.뜻).trim();
+      const seen = new Set([right]);
+      const opts = [right];
+      for (const x of shuffleArray(G.pool)) {
+        const m = String(x.뜻).trim();
+        if (!seen.has(m) && x.영어단어 !== w.영어단어) { seen.add(m); opts.push(m); }
+        if (opts.length >= 4) break;
+      }
+      return shuffleArray(opts);
+    }
+
+    function startQuiz() {
+      G.timeLeft = G.mode === "타임어택" ? TA_SECONDS * 1000 : SV_SECONDS * 1000;
+      G.lastTick = Date.now();
+      nextQuestion();
+      G.timers.push(setInterval(tickQuiz, 100));
+    }
+
+    function tickQuiz() {
+      if (!G || !G.running) return;
+      const now = Date.now();
+      G.timeLeft -= (now - G.lastTick);
+      G.lastTick = now;
+      if (G.timeLeft <= 0) {
+        G.timeLeft = 0;
+        if (G.mode === "서바이벌" && G.cur) G.wrongWords.push(G.cur);
+        return endGame(G.mode === "서바이벌" ? "⏰ 시간 초과!" : "⏱️ 시간 끝!");
+      }
+      const bar = document.getElementById("gTimeBar"), txt = document.getElementById("gTimeTxt");
+      const total = G.mode === "타임어택" ? TA_SECONDS * 1000 : SV_SECONDS * 1000;
+      if (bar) { bar.style.width = `${Math.max(0, G.timeLeft / total * 100)}%`; bar.style.background = G.timeLeft < total * 0.25 ? "#f43f5e" : "#3b82f6"; }
+      if (txt) txt.textContent = `${Math.ceil(G.timeLeft / 1000)}초`;
+    }
+
+    function nextQuestion() {
+      if (!G || !G.running) return;
+      if (G.qi >= G.order.length) {
+        const last = G.cur;
+        G.order = shuffleArray(G.words);
+        if (G.order.length > 1 && last && G.order[0].영어단어 === last.영어단어) G.order.push(G.order.shift());
+        G.qi = 0;
+      }
+      G.cur = G.order[G.qi++];
+      G.opts = makeOptions(G.cur);
+      G.locked = false;
+      if (G.mode === "서바이벌") { G.timeLeft = SV_SECONDS * 1000; G.lastTick = Date.now(); }
+      const total = G.mode === "타임어택" ? TA_SECONDS * 1000 : SV_SECONDS * 1000;
+      const scoreTxt = G.mode === "타임어택" ? `<p class="text-[11px] text-slate-400">정답</p><p class="pq-num text-2xl font-black text-slate-900">${G.correct}</p>`
+                                             : `<p class="text-[11px] text-slate-400">연속</p><p class="pq-num text-2xl font-black text-orange-500">${G.correct}</p>`;
+      document.getElementById("gameArea").innerHTML = `<div class="pq-card p-4 space-y-4">
+        ${gameTopBar(`<p class="text-sm font-black text-slate-900">${GAME_MODES[G.mode].icon} ${GAME_MODES[G.mode].name}</p>`, scoreTxt)}
+        <div><div class="flex justify-between text-[11px] font-bold text-slate-400 mb-1"><span>${G.combo >= 3 ? `🔥 ${G.combo} 콤보!` : "&nbsp;"}</span><span id="gTimeTxt">${Math.ceil(G.timeLeft / 1000)}초</span></div>
+          <div class="h-2 bg-slate-100 rounded-full overflow-hidden"><div id="gTimeBar" class="h-2 rounded-full" style="width:${G.timeLeft / total * 100}%;background:#3b82f6;transition:width .1s linear"></div></div></div>
+        <div class="text-center py-3 pq-pop">
+          <p class="text-3xl md:text-4xl font-black text-slate-900 tracking-tight break-words">${escapeHtml(G.cur.영어단어)}</p>
+          <button onclick="speakWord(G.cur.영어단어)" class="mt-2 text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-full">🔊 발음</button>
+        </div>
+        <div class="space-y-2">${G.opts.map((o, i) => `<button id="gOpt${i}" onclick="answerQuiz(${i})" class="pq-opt">${escapeHtml(o)}</button>`).join("")}</div>
+      </div>`;
+    }
+
+    function answerQuiz(i) {
+      if (!G || !G.running || G.locked) return;
+      markUserInteraction();
+      G.locked = true;
+      const right = String(G.cur.뜻).trim();
+      const ok = G.opts[i] === right;
+      const btn = document.getElementById(`gOpt${i}`);
+      if (ok) {
+        G.correct += 1; G.combo += 1; G.maxCombo = Math.max(G.maxCombo, G.combo);
+        if (btn) btn.classList.add("ok");
+        try { navigator.vibrate && navigator.vibrate(15); } catch (e) {}
+        G.timers.push(setTimeout(nextQuestion, 220));
+      } else {
+        G.wrong += 1; G.combo = 0;
+        G.wrongWords.push(G.cur);
+        if (btn) btn.classList.add("bad");
+        const ri = G.opts.indexOf(right);
+        const rb = document.getElementById(`gOpt${ri}`);
+        if (rb) rb.classList.add("ok");
+        try { navigator.vibrate && navigator.vibrate([30, 40, 30]); } catch (e) {}
+        if (G.mode === "서바이벌") { G.timers.push(setTimeout(() => endGame("💥 틀렸어요!"), 700)); return; }
+        G.timeLeft -= 2000;
+        G.timers.push(setTimeout(nextQuestion, 650));
+      }
+    }
+
+    // ---------- 짝 맞추기 ----------
+    function startMatch() {
+      const n = Math.min(MATCH_PAIRS, G.words.length);
+      const picks = shuffleArray(G.words).slice(0, n);
+      G.pairs = n;
+      G.cards = shuffleArray([
+        ...picks.map((w, i) => ({ id: i, side: "en", text: w.영어단어, w })),
+        ...picks.map((w, i) => ({ id: i, side: "ko", text: String(w.뜻).trim(), w }))
+      ]).map((c, k) => ({ ...c, k, gone: false }));
+      G.sel = null; G.matched = 0; G.penalty = 0; G.start = Date.now();
+      renderMatch();
+      G.timers.push(setInterval(() => {
+        const t = document.getElementById("gMatchTime");
+        if (t && G && G.running) t.textContent = `${((Date.now() - G.start + G.penalty) / 1000).toFixed(1)}초`;
+      }, 100));
+    }
+
+    function renderMatch() {
+      document.getElementById("gameArea").innerHTML = `<div class="pq-card p-4 space-y-3">
+        ${gameTopBar(`<p class="text-sm font-black text-slate-900">🧩 짝 맞추기 <span class="text-slate-400 font-bold">${G.matched}/${G.pairs}</span></p>`,
+          `<p class="text-[11px] text-slate-400">시간</p><p id="gMatchTime" class="pq-num text-xl font-black text-slate-900">0.0초</p>`)}
+        <p class="text-[11px] text-slate-400 text-center">영어와 뜻을 하나씩 눌러 짝을 맞춰요 · 틀리면 +1초</p>
+        <div class="grid grid-cols-3 sm:grid-cols-4 gap-2">${G.cards.map(c => `<button id="gMc${c.k}" onclick="tapMatch(${c.k})" class="pq-mc ${c.gone ? "gone" : ""} ${c.side === "en" ? "en" : ""}">${escapeHtml(c.text)}</button>`).join("")}</div>
+      </div>`;
+    }
+
+    function tapMatch(k) {
+      if (!G || !G.running || G.mode !== "짝맞추기" || G.busy) return;
+      markUserInteraction();
+      const c = G.cards[k];
+      if (!c || c.gone) return;
+      const el = document.getElementById(`gMc${k}`);
+      if (G.sel === null) { G.sel = k; if (el) el.classList.add("sel"); return; }
+      if (G.sel === k) { G.sel = null; if (el) el.classList.remove("sel"); return; }
+      const a = G.cards[G.sel];
+      const elA = document.getElementById(`gMc${G.sel}`);
+      if (a.side === c.side) { if (elA) elA.classList.remove("sel"); G.sel = k; if (el) el.classList.add("sel"); return; }
+      if (a.id === c.id) {
+        a.gone = c.gone = true; G.matched += 1; G.correct += 1; G.sel = null;
+        if (elA) elA.classList.add("gone"); if (el) el.classList.add("gone");
+        try { navigator.vibrate && navigator.vibrate(15); } catch (e) {}
+        const hdr = document.querySelector("#gameArea .text-sm.font-black span");
+        if (hdr) hdr.textContent = `${G.matched}/${G.pairs}`;
+        if (G.matched >= G.pairs) { G.elapsed = Date.now() - G.start + G.penalty; endGame("🎉 다 맞췄어요!"); }
+      } else {
+        G.wrong += 1; G.penalty += 1000; G.busy = true;
+        if (!G.wrongWords.some(w => w.영어단어 === a.w.영어단어)) G.wrongWords.push(a.w);
+        if (elA) { elA.classList.remove("sel"); elA.classList.add("bad"); }
+        if (el) el.classList.add("bad");
+        try { navigator.vibrate && navigator.vibrate([30, 40, 30]); } catch (e) {}
+        G.timers.push(setTimeout(() => { if (elA) elA.classList.remove("bad"); if (el) el.classList.remove("bad"); if (G) { G.sel = null; G.busy = false; } }, 450));
+      }
+    }
+
+    // ---------- 결과 · 저장 ----------
+    function gameScoreOf(g) {
+      return g.mode === "짝맞추기" ? Math.max(3000, Math.round(g.elapsed || 0)) : g.correct;
+    }
+
+    function gameQualifies(g) {
+      if (g.mode === "짝맞추기") return g.matched >= g.pairs && g.pairs >= 4;
+      return g.correct >= 10;
+    }
+
+    async function endGame(reason) {
+      if (!G || !G.running) return;
+      G.running = false;
+      stopGameTimers();
+      const g = G;
+      const score = gameScoreOf(g);
+      const prevBest = myWeekBest(g.mode);
+      const low = GAME_MODES[g.mode].better === "low";
+      const isRecord = prevBest === null ? score > 0 : (low ? score < prevBest : score > prevBest);
+      const finished = g.mode !== "짝맞추기" || g.matched >= g.pairs;
+      const uniqWrong = [];
+      g.wrongWords.forEach(w => { if (w && !uniqWrong.some(x => x.영어단어 === w.영어단어)) uniqWrong.push(w); });
+      g.uniqWrong = uniqWrong;
+      const big = g.mode === "짝맞추기" ? `${(score / 1000).toFixed(1)}<span class="text-xl">초</span>` : `${score}<span class="text-xl">${g.mode === "서바이벌" ? "연속" : "개"}</span>`;
+      document.getElementById("gameArea").innerHTML = `<div class="pq-card p-5 text-center space-y-3">
+        <p class="text-sm font-bold text-slate-500">${reason}</p>
+        <p class="pq-num text-6xl font-black text-slate-900 pq-pop">${big}</p>
+        ${finished && isRecord && score > 0 ? `<p class="inline-block bg-amber-100 text-amber-800 text-xs font-black px-3 py-1 rounded-full">🏅 이번 주 내 최고 기록!</p>` : prevBest !== null ? `<p class="text-xs text-slate-400">이번 주 내 최고: ${fmtGameScore(g.mode, prevBest)}</p>` : ""}
+        <div class="grid grid-cols-3 gap-2 text-xs">
+          <div class="pq-tile"><p class="text-slate-400 font-bold">정답</p><p class="pq-num text-lg font-black text-emerald-600">${g.correct}</p></div>
+          <div class="pq-tile"><p class="text-slate-400 font-bold">오답</p><p class="pq-num text-lg font-black text-rose-500">${g.wrong}</p></div>
+          <div class="pq-tile"><p class="text-slate-400 font-bold">${g.mode === "짝맞추기" ? "벌점 시간" : "최대 콤보"}</p><p class="pq-num text-lg font-black text-slate-900">${g.mode === "짝맞추기" ? `${(g.penalty / 1000).toFixed(0)}초` : g.maxCombo}</p></div>
+        </div>
+        <p id="gSaveMsg" class="text-xs text-slate-500">${finished ? "⏳ 기록 저장 중..." : ""}</p>
+        ${uniqWrong.length ? `<div class="text-left bg-rose-50 rounded-2xl p-3">
+          <p class="text-xs font-black text-rose-700 mb-1.5">❌ 틀린 단어 ${uniqWrong.length}개</p>
+          <div class="space-y-1 max-h-48 overflow-y-auto">${uniqWrong.map(w => `<div class="flex justify-between gap-2 text-xs"><b class="text-slate-900">${escapeHtml(w.영어단어)}</b><span class="text-slate-600 text-right">${escapeHtml(w.뜻)}</span></div>`).join("")}</div>
+          <button onclick="saveGameWrongToMyVoca()" id="gWrongBtn" class="mt-2 w-full bg-amber-400 hover:bg-amber-500 text-slate-900 font-extrabold py-2 rounded-xl text-xs">⭐ 나만의 단어장에 담기</button></div>` : ""}
+        <div class="grid grid-cols-2 gap-2 pt-1">
+          <button onclick="startGame('${g.mode}'${g.eventId ? `, ${g.eventId}` : ""})" class="bg-blue-600 hover:bg-blue-700 text-white font-black py-3 rounded-2xl text-sm">🔁 다시 하기</button>
+          <button onclick="quitGame()" class="bg-slate-100 hover:bg-slate-200 text-slate-800 font-black py-3 rounded-2xl text-sm">🎮 게임 홈</button>
+        </div>
+      </div>`;
+      G = { ...g, done: true };
+      if (finished && isRecord && score > 0 && typeof confetti === "function") { try { confetti({ particleCount: 90, spread: 70, origin: { y: 0.7 } }); } catch (e) {} }
+      if (!finished) return;
+      const msg = await saveGameResult(g, score);
+      const el = document.getElementById("gSaveMsg");
+      if (el) el.innerHTML = msg;
+    }
+
+    async function saveGameResult(g, score) {
+      const today = getKSTDateString();
+      if (g.student !== currentStudent) return "ℹ️ 게임 중에 이름이 바뀌어 기록을 저장하지 않았어요.";
+      const row = { 날짜: today, 이름: currentStudent, 모드: g.mode, 범위: `${g.cat} ${g.s}~${g.e}번`, 점수: score, 정답: g.correct, 오답: g.wrong };
+      if (g.eventId) row.이벤트 = g.eventId;
+      let saved = false;
+      try {
+        const { error } = await db.from("game_scores").insert(row);
+        saved = !error;
+        if (error) console.warn("게임 기록 저장 실패", error);
+      } catch (e) { console.warn("게임 기록 저장 실패", e); }
+      let msg = saved ? "✅ 기록 저장 완료! 순위에 반영됐어요." : "ℹ️ 기록은 저장되지 않았어요 (선생님 업데이트 전이거나 인터넷 연결 확인).";
+      // 보상: 성공 기준을 넘긴 판마다 +0.125P, 하루 최대 8번(1P). 다른 창에서 받은 것까지 서버에서 다시 세어 확인
+      if (saved && gameQualifies(g) && !gameRewardClaimedToday()) {
+        try {
+          const dup = await db.from("points").select("내역, 포인트증감").eq("이름", currentStudent).eq("날짜", today).like("내역", "단어 게임%");
+          const got = dup.error ? GAME_DAILY_MAX_TIMES : (dup.data || []).filter(p => parseFloat(p.포인트증감) > 0).length;
+          if (got < GAME_DAILY_MAX_TIMES) {
+            const desc = GAME_REWARD_DESC(got + 1);
+            await safeInsert("points", { 날짜: today, 이름: currentStudent, 내역: desc, 포인트증감: GAME_REWARD_P });
+            if (myData && myData.name === currentStudent) {
+              myData.pts = myData.pts.filter(p => !(p.날짜 === today && String(p.내역 || "").startsWith("단어 게임")))
+                .concat((dup.data || []).map(p => ({ 날짜: today, 이름: currentStudent, ...p })), [{ 날짜: today, 이름: currentStudent, 내역: desc, 포인트증감: GAME_REWARD_P }]);
+              const tot = myData.pts.reduce((a, r) => a + (parseFloat(r.포인트증감) || 0), 0);
+              const pt = document.getElementById("myPointsText");
+              if (pt) pt.textContent = `${Number(tot.toFixed(1))} P`;
+            }
+            msg += ` <b class="text-emerald-600">💎 +${GAME_REWARD_P}P! (오늘 ${got + 1}/${GAME_DAILY_MAX_TIMES})</b>`;
+          } else {
+            msg += ` <span class="text-slate-400">(오늘 게임 보상 1P를 모두 받았어요)</span>`;
+          }
+        } catch (e) { console.warn("게임 보상 지급 실패", e); }
+      } else if (saved && gameQualifies(g)) {
+        msg += ` <span class="text-slate-400">(오늘 게임 보상 1P를 모두 받았어요 · 기록은 순위에 반영)</span>`;
+      } else if (saved && !gameRewardClaimedToday()) {
+        msg += ` <span class="text-slate-400">(${g.mode === "짝맞추기" ? "끝까지 맞추면" : "10개 이상 맞히면"} +${GAME_REWARD_P}P)</span>`;
+      }
+      if (saved) await loadGameData(true);
+      return msg;
+    }
+
+    function saveGameWrongToMyVoca() {
+      markUserInteraction();
+      if (!G || !G.uniqWrong || !G.uniqWrong.length) return;
+      if (myVocaOwner !== currentStudent) { alert("나만의 단어장을 불러오는 중이에요. 잠시 후 다시 눌러 주세요."); return; }
+      G.uniqWrong.forEach(w => addToMyVoca(w, true));
+      updateMyVocaButton();
+      saveMyVoca();
+      const b = document.getElementById("gWrongBtn");
+      if (b) { b.textContent = `✅ ${G.uniqWrong.length}개 담았어요`; b.disabled = true; }
+    }
 
     window.addEventListener("DOMContentLoaded", initApp);
   </script>
