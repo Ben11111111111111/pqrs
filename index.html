@@ -21,6 +21,19 @@
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   <style>
     body { font-family: 'Pretendard', 'Malgun Gothic', sans-serif; background-color: #f8fafc; -webkit-tap-highlight-color: transparent; }
+    /* 내 현황·나의 순위 카드 디자인 (애플 스타일: 흰 카드, 큰 숫자, 옅은 그림자) */
+    /* 탭 내용이 짧아도 탭을 누르면 그 화면이 헤더 바로 아래까지 올라오도록 최소 높이 */
+    section[id^="tabContent_"] { min-height: calc(100vh - 130px); }
+    .pq-card { background: #fff; border-radius: 20px; box-shadow: 0 1px 2px rgba(15,23,42,.04), 0 8px 24px rgba(15,23,42,.06); }
+    .pq-h { font-size: 15px; font-weight: 800; color: #0f172a; letter-spacing: -0.01em; margin-bottom: 10px; }
+    .pq-num { font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+    .pq-seg { display: flex; gap: 4px; background: #e2e8f0; padding: 4px; border-radius: 14px; }
+    .pq-seg button { flex: 1; padding: 9px 6px; border-radius: 10px; font-size: 13px; font-weight: 800; color: #475569; transition: all .15s; }
+    .pq-seg button.on { background: #fff; color: #0f172a; box-shadow: 0 1px 3px rgba(15,23,42,.15); }
+    .pq-tile { background: #f8fafc; border-radius: 16px; padding: 12px 14px; }
+    @keyframes pqRing { from { stroke-dashoffset: var(--len); } }
+    .pq-ring { animation: pqRing 0.9s ease-out; }
+    @media (prefers-reduced-motion: reduce) { .pq-ring { animation: none; } }
     .flip-card { background-color: transparent; width: 100%; height: 170px; perspective: 1000px; }
     .flip-card-inner { position: relative; width: 100%; height: 100%; text-align: center; transition: transform 0.5s; transform-style: preserve-3d; cursor: pointer; }
     .flip-card.flipped .flip-card-inner { transform: rotateY(180deg); }
@@ -67,7 +80,7 @@
     </div>
 
     <section id="studentDashboard" class="hidden mb-5 space-y-3">
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+      <div id="dashStrip" class="grid grid-cols-2 md:grid-cols-4 gap-2.5">
         <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
           <p class="text-xs text-emerald-700 font-bold">💎 나의 장학금 포인트</p>
           <p id="myPointsText" class="text-2xl font-extrabold text-emerald-900 mt-1">0 P</p>
@@ -104,25 +117,24 @@
     </div>
 
     <!-- 탭: 🏠 내 현황 -->
-    <section id="tabContent_my" class="hidden space-y-4">
-      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-        <h2 class="text-base font-bold text-slate-800 mb-2">📅 내 수업 일정</h2>
-        <div id="mySchedule"></div>
-      </div>
-      <div class="bg-white p-4 rounded-xl shadow-sm border-2 border-rose-200">
-        <h2 class="text-base font-bold text-slate-800 mb-2">✅ 지금 챙겨야 할 것</h2>
+    <section id="tabContent_my" class="hidden space-y-3">
+      <div id="myHero" class="pq-card p-5"></div>
+      <div class="pq-card p-4">
+        <h2 class="pq-h">✅ 지금 할 일</h2>
         <div id="myTodo" class="space-y-2"></div>
       </div>
-      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-        <h2 class="text-base font-bold text-slate-800 mb-2">💎 내 포인트</h2>
-        <div id="myPointBox"></div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div class="pq-card p-4">
+          <h2 class="pq-h">📅 다가오는 수업</h2>
+          <div id="mySchedule"></div>
+        </div>
+        <div class="pq-card p-4">
+          <h2 class="pq-h">💎 내 포인트</h2>
+          <div id="myPointBox"></div>
+        </div>
       </div>
-      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-        <h2 class="text-base font-bold text-slate-800 mb-2">📊 나의 위치</h2>
-        <div id="myPosition"></div>
-      </div>
-      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-        <h2 class="text-base font-bold text-slate-800 mb-2">📈 나의 학습 기록</h2>
+      <div class="pq-card p-4">
+        <h2 class="pq-h">📈 전체 학습 기록 <span class="text-xs font-normal text-slate-400">· 처음부터 지금까지</span></h2>
         <div id="myRecord"></div>
       </div>
     </section>
@@ -143,13 +155,15 @@
       </div>
 
       <!-- 랭킹 전환 버튼 -->
-      <div class="grid grid-cols-2 gap-2 bg-slate-200 p-1.5 rounded-xl">
-        <button onclick="switchRankSubTab('time')" id="subTabBtn_time" class="py-2.5 rounded-lg text-xs md:text-sm font-extrabold bg-blue-900 text-white shadow">
-          🔥 열공 단어왕 (공부시간 순위)
-        </button>
-        <button onclick="switchRankSubTab('point')" id="subTabBtn_point" class="py-2.5 rounded-lg text-xs md:text-sm font-extrabold text-slate-700 hover:bg-slate-100">
-          💎 장학금 포인트 랭킹 (50P)
-        </button>
+      <div class="pq-seg">
+        <button onclick="switchRankSubTab('me')" id="subTabBtn_me">📊 나의 순위</button>
+        <button onclick="switchRankSubTab('time')" id="subTabBtn_time" class="on">🔥 공부시간왕</button>
+        <button onclick="switchRankSubTab('point')" id="subTabBtn_point">💎 장학금</button>
+      </div>
+
+      <!-- 서브탭 0: 나의 순위 (항목별 비교 · TOP 10) -->
+      <div id="rankSubBox_me" class="hidden space-y-3">
+        <div class="pq-card p-4"><div id="myPosition"></div></div>
       </div>
 
       <!-- 서브탭 1: 열공 단어왕 (순수 공부시간 랭킹) -->
@@ -504,22 +518,20 @@
       return m > 0 ? `${h}시간 ${m}분` : `${h}시간`;
     }
 
+    let rankSubMode = "";
     function switchRankSubTab(mode) {
-      const btnTime = document.getElementById("subTabBtn_time");
-      const btnPoint = document.getElementById("subTabBtn_point");
-      const boxTime = document.getElementById("rankSubBox_time");
-      const boxPoint = document.getElementById("rankSubBox_point");
-
-      if (mode === "time") {
-        btnTime.className = "py-2.5 rounded-lg text-xs md:text-sm font-extrabold bg-blue-900 text-white shadow";
-        btnPoint.className = "py-2.5 rounded-lg text-xs md:text-sm font-extrabold text-slate-700 hover:bg-slate-100";
-        boxTime.classList.remove("hidden");
-        boxPoint.classList.add("hidden");
-      } else {
-        btnPoint.className = "py-2.5 rounded-lg text-xs md:text-sm font-extrabold bg-blue-900 text-white shadow";
-        btnTime.className = "py-2.5 rounded-lg text-xs md:text-sm font-extrabold text-slate-700 hover:bg-slate-100";
-        boxPoint.classList.remove("hidden");
-        boxTime.classList.add("hidden");
+      rankSubMode = mode;
+      ["me", "time", "point"].forEach(m => {
+        const btn = document.getElementById(`subTabBtn_${m}`);
+        const box = document.getElementById(`rankSubBox_${m}`);
+        if (btn) btn.classList.toggle("on", m === mode);
+        if (box) box.classList.toggle("hidden", m !== mode);
+      });
+      if (mode === "me") {
+        const box = document.getElementById("myPosition");
+        if (!currentStudent) box.innerHTML = `<p class="text-sm text-slate-500 py-6 text-center">👆 오른쪽 위에서 내 이름을 고르면 나의 순위를 볼 수 있어요.</p>`;
+        else if (myData && myData.name === currentStudent) renderPeerBox(myData.stInfo);
+        else box.innerHTML = `<p class="text-sm text-slate-500">⏳ 불러오는 중...</p>`;
       }
     }
 
@@ -796,7 +808,7 @@
           localStorage.removeItem("pqrs_student");
         }
 
-        switchTab(currentTab);
+        switchTab(currentTab, { noScroll: true });
         restoreOngoingExamIfAny();
       } catch (err) {
         alert("데이터를 불러오는 중 일시적 네트워크 오류가 발생했습니다. 화면을 새로고침 해주세요: " + err.message);
@@ -854,7 +866,7 @@
         localStorage.removeItem("pqrs_student");
         document.getElementById("studentDashboard").classList.add("hidden");
       }
-      switchTab(currentTab);
+      switchTab(currentTab, { noScroll: true });
     }
 
     async function loadStudentPersonalData(stName) {
@@ -961,6 +973,7 @@
 
       myData = { name: stName, stInfo, pts: myPtData, att: attData, hw: hwAll, tests: myVocabTests, plans: wkRes.data || [] };
       if (currentTab === "my") renderMyOverview();
+      if (currentTab === "rank" && rankSubMode === "me") renderPeerBox(stInfo);
 
       const wkBox = document.getElementById("weeklyProgressBox");
       const planRows = wkRes.data || [];
@@ -1034,7 +1047,7 @@
       }
     }
 
-    function switchTab(tabName) {
+    function switchTab(tabName, opts = {}) {
       currentTab = tabName;
       localStorage.setItem("pqrs_tab", tabName);
       markUserInteraction();
@@ -1058,6 +1071,25 @@
         document.getElementById(`tabContent_${tabName}`).classList.remove("hidden");
         if (tabName === "core" && !coreActive) loadCoreAssignments();
         if (tabName === "my") renderMyOverview();
+        if (tabName === "rank") switchRankSubTab(rankSubMode || (currentStudent ? "me" : "time"));
+      }
+      // 탭을 누르면 위쪽 요약 카드는 그대로 두고, 그 탭 화면이 바로 보이도록 자동 스크롤 (처음 접속할 때는 안 함)
+      if (!opts.noScroll) {
+        const target = currentStudent || tabName === "rank" ? document.getElementById(`tabContent_${tabName}`) : warnBox;
+        // 헤더 글자(공부시간 측정 중 등)가 탭에 따라 바뀌어 높이가 달라질 수 있어 잠깐 뒤에 계산
+        setTimeout(() => {
+          if (!target || target.classList.contains("hidden")) return;
+          const hdr = document.querySelector("header");
+          const top = target.getBoundingClientRect().top + window.scrollY - (hdr ? hdr.offsetHeight : 0) - 8;
+          window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+          // 공부시간 표시가 1초마다 바뀌며 헤더 높이가 달라지면 한 번 더 맞춤
+          setTimeout(() => {
+            if (currentTab !== tabName || target.classList.contains("hidden")) return;
+            const h2 = document.querySelector("header");
+            const want = target.getBoundingClientRect().top + window.scrollY - (h2 ? h2.offsetHeight : 0) - 8;
+            if (Math.abs(want - window.scrollY) > 4 && Math.abs(want - window.scrollY) < 120) window.scrollTo({ top: Math.max(0, want), behavior: "smooth" });
+          }, 1100);
+        }, 80);
       }
     }
 
@@ -2600,20 +2632,13 @@
       return "와";
     }
 
-    // 이름 가운데 글자 가리기: 홍길동 → 홍*동, 김민 → 김*, 남궁민수 → 남**수
-    function maskName(nm) {
-      const c = Array.from(String(nm || ""));
-      if (c.length <= 1) return c.join("");
-      if (c.length === 2) return c[0] + "*";
-      return c[0] + "*".repeat(c.length - 2) + c[c.length - 1];
-    }
-
     // 🏆 항목별 TOP 10 (고른 범위 안에서)
     const PEER_TOP_N = 10;
     const PEER_TOP_MIN = 3;   // 비율 항목은 기록 3회 이상인 학생만 (1번 보고 100%가 1등 되는 것 방지)
     let peerTopMetric = "word";
     try { const v = localStorage.getItem("pqrs_peer_top"); if (v) peerTopMetric = v; } catch (e) {}
     const denOf = (d, o) => ({ word: o.w_n, hw: o.h_n, core: o.c_n, clinic: o.k_n, att: o.a_n })[d.k] || 0;
+    const numOf = (d, o) => ({ word: o.w_p, hw: o.h_d, core: o.c_d, clinic: o.k_p, att: o.a_p })[d.k] || 0;
 
     function setPeerTop(k) {
       peerTopMetric = k;
@@ -2629,10 +2654,12 @@
       const rows = peerMembers(stInfo, scope).map(n => {
         const o = data.cur[n] || EMPTY_PEER();
         const v = d.get(o);
-        return { n, v, den: denOf(d, o), o };
+        return { n, v, den: denOf(d, o), num: numOf(d, o), o };
       }).filter(x => x.v !== null && (d.rate ? x.den >= PEER_TOP_MIN : x.v > 0));
-      rows.sort((a, b) => (b.v - a.v) || (b.den - a.den));
-      rows.forEach((x, i) => { x.rank = i && Math.abs(rows[i - 1].v - x.v) < 1e-9 ? rows[i - 1].rank : i + 1; });
+      // 같은 비율이면 횟수가 많은 쪽이 위 (4번 중 4번 > 3번 중 3번). 비율·횟수가 모두 같을 때만 공동 순위
+      const sameAs = (a, b) => Math.abs(a.v - b.v) < 1e-9 && (!d.rate || a.den === b.den);
+      rows.sort((a, b) => (b.v - a.v) || (d.rate ? b.den - a.den : 0));
+      rows.forEach((x, i) => { x.rank = i && sameAs(rows[i - 1], x) ? rows[i - 1].rank : i + 1; });
       const sObj = PEER_SCOPES.find(x => x.k === scope);
       let body;
       if (rows.length < PEER_MIN_OTHERS + 1) {
@@ -2645,7 +2672,7 @@
           return `<div class="flex items-center gap-2 px-2.5 py-1.5 ${me ? "bg-blue-50 font-bold" : ""}">
             <span class="w-7 shrink-0 text-center ${x.rank <= 3 ? "text-base" : "text-slate-500 font-bold"}">${medal(x.rank)}</span>
             <span class="flex-1 text-slate-800">${escapeHtml(maskName(x.n))}${me ? ' <span class="text-blue-700">(나)</span>' : ""}</span>
-            <span class="text-[10px] text-slate-400">${d.rate ? `${x.den}회` : ""}</span>
+            <span class="text-[10px] text-slate-400 pq-num">${d.rate ? `${x.num}/${x.den}` : ""}</span>
             <span class="w-16 text-right font-bold text-slate-900">${fmt(x.v)}</span></div>`;
         }).join("") + `</div>`;
         const mine = rows.find(x => x.n === currentStudent);
@@ -2660,7 +2687,7 @@
         <p class="text-sm font-bold text-slate-800 mb-1">🏆 항목별 TOP ${PEER_TOP_N} <span class="text-xs font-normal text-slate-500">· ${sObj.label} · 최근 ${PEER_DAYS}일</span></p>
         <div class="flex flex-wrap gap-1 mb-2">${chips}</div>
         ${body}
-        <p class="text-[10px] text-slate-400 mt-1">이름 가운데 글자는 가려져요${d.rate ? ` · 비율 항목은 기록 ${PEER_TOP_MIN}회 이상인 친구만` : ""}</p>
+        <p class="text-[10px] text-slate-400 mt-1">이름 가운데 글자는 가려져요${d.rate ? ` · 회색 숫자 = 통과(제출·참석)/전체 · 비율이 같으면 횟수가 많은 쪽이 위 · 기록 ${PEER_TOP_MIN}회 이상인 친구만` : ""}</p>
       </div>`;
     }
 
@@ -2674,18 +2701,23 @@
       const box = document.getElementById("myPosition");
       if (!box) return;
       const key = `${currentStudent}|${getKSTDateString()}|${myData && myData.tests ? myData.tests.length : 0}|${myData && myData.pts ? myData.pts.length : 0}`;
-      if (peerCache.key === key && peerCache.data) { box.innerHTML = peerHtml(stInfo, peerCache.data); return; }
+      const paint = data => { box.innerHTML = peerHtml(stInfo, data); renderMyHero(stInfo, data); };
+      if (peerCache.key === key && peerCache.data) { paint(peerCache.data); return; }
       box.innerHTML = `<p class="text-sm text-slate-500">⏳ 친구들과 비교하는 중...</p>`;
+      renderMyHero(stInfo, null);
       if (peerCache.loading === key) return;
       peerCache.loading = key;
       const who = currentStudent;
       loadPeerData(stInfo).then(data => {
         peerCache = { key, data, loading: "" };
-        if (currentStudent === who && currentTab === "my") box.innerHTML = peerHtml(stInfo, data);
+        if (currentStudent === who) paint(data);
       }).catch(e => {
         console.warn("비교 자료 불러오기 실패", e);
         peerCache.loading = "";
-        if (currentStudent === who) box.innerHTML = `<p class="text-sm text-slate-500">비교 자료를 불러오지 못했어요. 잠시 후 새로고침해 주세요.</p>`;
+        if (currentStudent === who) {
+          box.innerHTML = `<p class="text-sm text-slate-500">비교 자료를 불러오지 못했어요. 잠시 후 새로고침해 주세요.</p>`;
+          renderMyHero(stInfo, { failed: true });
+        }
       });
     }
 
@@ -2713,6 +2745,87 @@
       return now - before;
     }
 
+    // 잘하는 것 · 목표 · 나아진 것 (내 현황 첫 화면과 나의 순위에서 같이 씀)
+    function peerInsights(stInfo, data, scope) {
+      const pct = v => `${Math.round(v * 100)}%`;
+      const fmtOf = d => d.fmt || pct;
+      const diffStr = (d, v) => d.rate ? `${Math.round(Math.abs(v) * 100)}%p` : fmtOf(d)(Math.abs(v));
+      const isSame = (d, v) => d.rate ? Math.abs(v) < 0.005 : Math.abs(v) < (d.k === "mins" ? 0.5 : 0.05);
+      const metrics = PEER_METRICS.filter(d => d.k !== "clinic" || data.hasClinic);
+      const cmp = metrics.map(d => ({ d, c: peerCompare(d, data, scope, stInfo), ch: peerChange(d, data) }));
+      const comparable = cmp.filter(x => x.c.rank);
+      const rel = x => x.c.avg > 0 ? x.c.diff / x.c.avg : (x.c.mine > 0 ? 1 : 0);
+      const best = comparable.filter(x => x.c.diff > 0 && !isSame(x.d, x.c.diff)).sort((a, b) => (a.c.rank / a.c.n) - (b.c.rank / b.c.n) || rel(b) - rel(a))[0] || null;
+      const weak = comparable.filter(x => x.c.diff < 0 && !isSame(x.d, x.c.diff)).sort((a, b) => rel(a) - rel(b))[0] || null;
+      const ups = cmp.filter(x => x.ch !== null && x.ch > 0 && !isSame(x.d, x.ch)).sort((a, b) => (b.d.rate - a.d.rate) || (b.ch - a.ch)).slice(0, 3);
+      return { metrics, cmp, best, weak, ups, comparable: comparable.length > 0, diffStr, isSame };
+    }
+
+    // 🏠 내 현황 첫 화면: 최근 30일 학습 링 3개 (애플 피트니스 링처럼) + 한 줄 요약
+    function ringSvg(rings) {
+      const size = 132, cx = size / 2, sw = 13, gap = 3;
+      return `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" class="shrink-0" role="img" aria-label="최근 30일 학습 링">
+        ${rings.map((rg, i) => {
+          const rad = cx - sw / 2 - i * (sw + gap);
+          const len = 2 * Math.PI * rad;
+          const v = rg.v === null ? 0 : Math.max(0, Math.min(1, rg.v));
+          return `<circle cx="${cx}" cy="${cx}" r="${rad}" fill="none" stroke="${rg.track}" stroke-width="${sw}"/>
+            ${v > 0 ? `<circle class="pq-ring" style="--len:${len}" cx="${cx}" cy="${cx}" r="${rad}" fill="none" stroke="${rg.color}" stroke-width="${sw}" stroke-linecap="round"
+              stroke-dasharray="${len}" stroke-dashoffset="${len * (1 - v)}" transform="rotate(-90 ${cx} ${cx})"/>` : ""}`;
+        }).join("")}
+      </svg>`;
+    }
+
+    function renderMyHero(stInfo, data) {
+      const el = document.getElementById("myHero");
+      if (!el || !currentStudent) return;
+      const nm = String(currentStudent);
+      const first = Array.from(nm).length >= 3 ? Array.from(nm).slice(1).join("") : nm;
+      const today = getKSTDateString();
+      const head = `<div class="flex items-start justify-between gap-2 mb-3">
+          <div><p class="text-[12px] font-bold text-slate-400">${today.slice(5).replace("-", "월 ")}일 · 최근 30일</p>
+          <p class="text-xl font-black text-slate-900 tracking-tight">${escapeHtml(first)}, 오늘도 화이팅 👋</p></div>
+          <button onclick="switchTab('rank'); switchRankSubTab('me')" class="shrink-0 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-2 rounded-full">내 순위 보기 ›</button>
+        </div>`;
+      if (!data || data.failed) {
+        el.innerHTML = head + `<p class="text-sm text-slate-400 py-6 text-center">${data && data.failed ? "학습 링을 불러오지 못했어요." : "⏳ 학습 링을 그리는 중..."}</p>`;
+        return;
+      }
+      const me = data.cur[currentStudent] || EMPTY_PEER();
+      const hwN = me.h_n + me.c_n, hwD = me.h_d + me.c_d;
+      const ins = peerInsights(stInfo, data, "sg");
+      const rankOf = k => { const x = ins.cmp.find(c => c.d.k === k); return x && x.c.rank ? `학교·학년 ${x.c.n}명 중 ${x.c.rank}등` : ""; };
+      const hwRank = (() => {   // 과제는 일반+CORE 합쳐서 링 하나
+        const names = peerMembers(stInfo, "sg");
+        const vals = names.map(n => { const o = data.cur[n] || EMPTY_PEER(); const t = o.h_n + o.c_n; return { n, v: t ? (o.h_d + o.c_d) / t : null }; }).filter(x => x.v !== null);
+        const mine = vals.find(x => x.n === currentStudent);
+        if (!mine || vals.length < PEER_MIN_OTHERS + 1) return "";
+        return `학교·학년 ${vals.length}명 중 ${1 + vals.filter(x => x.v > mine.v + 1e-9).length}등`;
+      })();
+      const rings = [
+        { k: "word", label: "단어 통과율", v: me.w_n ? me.w_p / me.w_n : null, sub: me.w_n ? `${me.w_p}/${me.w_n}회` : "기록 없음", rank: rankOf("word"), color: "#ff2d55", track: "#ffe4ea" },
+        { k: "hw", label: "과제 제출율", v: hwN ? hwD / hwN : null, sub: hwN ? `${hwD}/${hwN}건` : "기록 없음", rank: hwRank, color: "#34c759", track: "#dcfce7" },
+        { k: "att", label: "출석률", v: me.a_n ? me.a_p / me.a_n : null, sub: me.a_n ? `${me.a_p}/${me.a_n}회` : "기록 없음", rank: rankOf("att"), color: "#0a84ff", track: "#dbeafe" }
+      ];
+      const legend = rings.map(rg => `<div class="flex items-center gap-2.5">
+          <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background:${rg.color}"></span>
+          <div class="min-w-0"><p class="text-[11px] font-bold text-slate-500">${rg.label}</p>
+          <p class="leading-tight"><span class="pq-num text-2xl font-black" style="color:${rg.color}">${rg.v === null ? "–" : Math.round(rg.v * 100) + "%"}</span>
+          <span class="text-[11px] text-slate-400 ml-1">${rg.sub}</span></p>
+          ${rg.rank ? `<p class="text-[10px] font-bold text-slate-400">${rg.rank}</p>` : ""}</div></div>`).join("");
+      const chips = [];
+      // 휴대폰: 한 줄씩 (제목 · 항목 · 설명) / 넓은 화면: 3칸
+      const tile = (t, c, main, sub) => `<div class="pq-tile flex sm:block items-center justify-between gap-2">
+          <div><p class="text-[11px] font-bold ${c}">${t}</p><p class="text-sm font-extrabold text-slate-900">${main}</p></div>
+          <p class="text-[11px] text-slate-500 text-right sm:text-left shrink-0">${sub}</p></div>`;
+      if (ins.best) chips.push(tile("🌟 가장 잘하는 것", "text-amber-600", ins.best.d.label, `학교·학년 ${ins.best.c.n}명 중 ${ins.best.c.rank}등`));
+      if (ins.weak) chips.push(tile("🎯 이번 목표", "text-rose-600", ins.weak.d.label, `평균까지 ${ins.diffStr(ins.weak.d, ins.weak.c.diff)}`));
+      if (ins.ups.length) chips.push(tile("📈 지난 30일보다", "text-emerald-600", ins.ups[0].d.label, `+${ins.diffStr(ins.ups[0].d, ins.ups[0].ch)} 늘었어요`));
+      el.innerHTML = head + `
+        <div class="flex items-center gap-5">${ringSvg(rings)}<div class="space-y-2.5 min-w-0">${legend}</div></div>
+        ${chips.length ? `<div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-4">${chips.join("")}</div>` : ""}`;
+    }
+
     function peerHtml(stInfo, data) {
       const pct = v => `${Math.round(v * 100)}%`;
       const scopeObj = PEER_SCOPES.find(x => x.k === peerScope) || PEER_SCOPES[0];
@@ -2731,23 +2844,14 @@
       }).join("");
 
       // 요약 (선택한 범위 기준 + 지난 30일 대비 나의 변화)
-      const metrics = PEER_METRICS.filter(d => d.k !== "clinic" || data.hasClinic);
-      const cmp = metrics.map(d => ({ d, c: peerCompare(d, data, scope, stInfo), ch: peerChange(d, data) }));
-      const comparable = cmp.filter(x => x.c.rank);
+      const ins = peerInsights(stInfo, data, scope);
+      const metrics = ins.metrics, cmp = ins.cmp;
       const parts = [];
-      if (comparable.length) {
-        const rel = x => x.c.avg > 0 ? x.c.diff / x.c.avg : (x.c.mine > 0 ? 1 : 0);
-        const best = comparable.filter(x => x.c.diff > 0 && !isSame(x.d, x.c.diff)).sort((a, b) => (a.c.rank / a.c.n) - (b.c.rank / b.c.n) || rel(b) - rel(a))[0];
-        const weak = comparable.filter(x => x.c.diff < 0 && !isSame(x.d, x.c.diff)).sort((a, b) => rel(a) - rel(b))[0];
-        if (best) parts.push(`🌟 가장 잘하는 것: <b>${best.d.label}</b> (${sObj.label} ${best.c.n}명 중 <b>${best.c.rank}등</b>)`);
-        if (weak) parts.push(`🎯 이번 목표: <b>${weak.d.label}</b> 평균 넘기기 → ${weak.d.up}`);
-        if (!best && !weak) parts.push(`👏 대부분 평균 정도예요. 하나만 골라 평균을 넘겨 볼까요?`);
-      }
-      // 지난 30일보다 나아진 것 (비율 항목 먼저, 최대 3개)
-      const ups = cmp.filter(x => x.ch !== null && x.ch > 0 && !isSame(x.d, x.ch))
-        .sort((a, b) => (b.d.rate - a.d.rate) || (b.ch - a.ch)).slice(0, 3);
-      if (ups.length) parts.push(`📈 지난 30일보다 나아졌어요: ${ups.map(x => `<b>${x.d.label}</b> +${diffStr(x.d, x.ch)}`).join(", ")}`);
-      const summary = parts.length ? `<div class="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 mb-2 text-xs text-blue-950 space-y-0.5">${parts.map(p => `<p>${p}</p>`).join("")}</div>` : "";
+      if (ins.best) parts.push(`🌟 가장 잘하는 것: <b>${ins.best.d.label}</b> (${sObj.label} ${ins.best.c.n}명 중 <b>${ins.best.c.rank}등</b>)`);
+      if (ins.weak) parts.push(`🎯 이번 목표: <b>${ins.weak.d.label}</b> 평균 넘기기 → ${ins.weak.d.up}`);
+      if (ins.comparable && !ins.best && !ins.weak) parts.push(`👏 대부분 평균 정도예요. 하나만 골라 평균을 넘겨 볼까요?`);
+      if (ins.ups.length) parts.push(`📈 지난 30일보다 나아졌어요: ${ins.ups.map(x => `<b>${x.d.label}</b> +${ins.diffStr(x.d, x.ch)}`).join(", ")}`);
+      const summary = parts.length ? `<div class="bg-blue-50 rounded-2xl px-3.5 py-2.5 mb-3 text-xs text-blue-950 space-y-1">${parts.map(p => `<p>${p}</p>`).join("")}</div>` : "";
 
       // 한눈에 보는 순위표 (항목 × 범위 4개)
       const cell = c => c.mine === null ? `<span class="text-slate-300">-</span>`
