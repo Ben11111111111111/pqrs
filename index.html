@@ -109,6 +109,7 @@
       <p id="pwErr" class="hidden mt-2 text-sm font-bold text-rose-600"></p>
       <div class="mt-4 flex gap-2">
         <button id="pwLaterBtn" type="button" onclick="closePwModal()" class="flex-1 py-2.5 rounded-lg bg-slate-100 font-bold text-slate-700">취소</button>
+        <button id="pwLogoutBtn" type="button" onclick="logoutFromPwModal()" class="hidden flex-1 py-2.5 rounded-lg bg-slate-100 font-bold text-slate-700">로그아웃</button>
         <button id="pwSaveBtn" type="submit" class="flex-1 py-2.5 rounded-lg bg-blue-900 text-white font-extrabold">저장</button>
       </div>
     </form>
@@ -1020,8 +1021,17 @@
         ? "처음 비번은 선생님도 알고 있어요. 나만 아는 비밀번호로 바꿔 주세요. (4자 이상)"
         : "나만 아는 비밀번호로 정해 주세요. (4자 이상)";
       document.getElementById("pwLaterBtn").classList.toggle("hidden", pwForced);
+      document.getElementById("pwLogoutBtn").classList.toggle("hidden", !pwForced);
       document.getElementById("pwModal").classList.remove("hidden");
       setTimeout(() => document.getElementById("pwNew1").focus(), 50);
+    }
+
+    // 처음 비번 창에서 비번을 안 바꾸고 나가기 (다음에 들어오면 다시 바꾸라고 나옴)
+    async function logoutFromPwModal() {
+      pwForced = false;
+      lastLoginPw = "";
+      document.getElementById("pwModal").classList.add("hidden");
+      await studentLogout();
     }
 
     function closePwModal() {
