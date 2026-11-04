@@ -73,8 +73,7 @@
       <div class="flex items-center space-x-2">
         <select id="studentSelect" onchange="onStudentChange()" class="bg-white text-blue-950 font-extrabold text-sm rounded-lg px-3 py-2 border-2 border-yellow-400 focus:outline-none shadow-sm">
           <option value="">👉 내 이름 선택</option>
-        </select>
-      </div>
+        </select>      </div>
     </div>
     <div class="max-w-4xl mx-auto px-2 flex border-t border-blue-800 bg-blue-950 text-xs md:text-sm font-semibold">
       <button onclick="switchTab('my')" id="tabBtn_my" class="flex-1 py-3 text-center border-b-4 border-transparent text-blue-200">🏠 내 현황</button>
@@ -85,6 +84,36 @@
     </div>
   </header>
 
+  <div id="loginModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center px-4">
+    <form onsubmit="event.preventDefault(); submitLogin();" class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5">
+      <p id="loginTitle" class="text-lg font-extrabold text-blue-950">🔒 로그인</p>
+      <input id="loginPw" type="password" autocomplete="current-password" placeholder="비밀번호"
+             class="mt-3 w-full border-2 border-slate-300 rounded-lg px-3 py-2.5 text-lg font-bold tracking-widest focus:border-blue-700 outline-none">
+      <p id="loginErr" class="hidden mt-2 text-sm font-bold text-rose-600"></p>
+      <div class="mt-4 flex gap-2">
+        <button type="button" onclick="closeLogin()" class="flex-1 py-2.5 rounded-lg bg-slate-100 font-bold text-slate-700">취소</button>
+        <button id="loginBtn" type="submit" class="flex-1 py-2.5 rounded-lg bg-blue-900 text-white font-extrabold">들어가기</button>
+      </div>
+      <p class="mt-3 text-[11px] text-slate-500">처음이면 선생님께 받은 4자리를 넣으세요. 비밀번호를 잊었으면 선생님께 말씀하세요.</p>
+    </form>
+  </div>
+
+  <div id="pwModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center px-4">
+    <form onsubmit="event.preventDefault(); submitNewPw();" class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5">
+      <p class="text-lg font-extrabold text-blue-950">🔑 내 비밀번호 정하기</p>
+      <p id="pwHint" class="text-xs text-slate-500 mt-1">나만 아는 비밀번호로 정해 주세요. (4자 이상)</p>
+      <input id="pwNew1" type="password" autocomplete="new-password" placeholder="새 비밀번호"
+             class="mt-3 w-full border-2 border-slate-300 rounded-lg px-3 py-2.5 text-lg font-bold tracking-widest focus:border-blue-700 outline-none">
+      <input id="pwNew2" type="password" autocomplete="new-password" placeholder="한 번 더"
+             class="mt-2 w-full border-2 border-slate-300 rounded-lg px-3 py-2.5 text-lg font-bold tracking-widest focus:border-blue-700 outline-none">
+      <p id="pwErr" class="hidden mt-2 text-sm font-bold text-rose-600"></p>
+      <div class="mt-4 flex gap-2">
+        <button id="pwLaterBtn" type="button" onclick="closePwModal()" class="flex-1 py-2.5 rounded-lg bg-slate-100 font-bold text-slate-700">취소</button>
+        <button id="pwSaveBtn" type="submit" class="flex-1 py-2.5 rounded-lg bg-blue-900 text-white font-extrabold">저장</button>
+      </div>
+    </form>
+  </div>
+
   <main class="max-w-4xl mx-auto px-4 pt-4">
     <div id="globalLoader" class="text-center py-14">
       <div class="inline-block animate-spin rounded-full h-9 w-9 border-4 border-blue-900 border-t-transparent"></div>
@@ -92,6 +121,10 @@
     </div>
 
     <section id="studentDashboard" class="hidden mb-5 space-y-3">
+      <div id="loginBar" class="hidden flex justify-end gap-3 -mb-1 text-xs font-bold text-slate-500">
+        <button id="pwChangeBtn" onclick="openPwModal(false)" class="hover:text-blue-900">🔑 비밀번호 바꾸기</button>
+        <button id="logoutBtn" onclick="studentLogout()" class="hover:text-blue-900">🚪 로그아웃</button>
+      </div>
       <div id="dashStrip" class="grid grid-cols-2 md:grid-cols-4 gap-2.5">
         <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
           <p class="text-xs text-emerald-700 font-bold">💎 나의 장학금 포인트</p>
@@ -755,11 +788,13 @@
     // 랭킹용 데이터: Supabase의 points_summary(합계 뷰)를 먼저 사용하고,
     // 아직 뷰가 없으면 예전 방식(전체 기록 다운로드)으로 자동 대체합니다.
     async function loadRankingData() {
-      const [sumRes, giftRes, payRes] = await Promise.all([
-        db.from("points_summary").select("*"),
-        db.from("points").select("날짜, 이름, 내역, 포인트증감").like("내역", "[시크릿선물]%").order("날짜", { ascending: false }).limit(30),
-        db.from("points").select("날짜, 이름, 내역, 포인트증감").like("내역", "장학금%")
+      // 시크릿선물·장학금 소식은 points_public_feed(그 두 종류만 모은 요약표)에서. 아직 없으면 예전처럼 points에서
+      const feed = t => Promise.all([
+        db.from(t).select("날짜, 이름, 내역, 포인트증감").like("내역", "[시크릿선물]%").order("날짜", { ascending: false }).limit(30),
+        db.from(t).select("날짜, 이름, 내역, 포인트증감").like("내역", "장학금%")
       ]);
+      let [sumRes, [giftRes, payRes]] = await Promise.all([db.from("points_summary").select("*"), feed("points_public_feed")]);
+      if (giftRes.error || payRes.error) [giftRes, payRes] = await feed("points");
 
       if (!sumRes.error && Array.isArray(sumRes.data)) {
         const map = {};
@@ -794,12 +829,15 @@
       }
 
       try {
-        const [stData, , wbData] = await Promise.all([
-          fetchAllRows("students", '이름, 학교, 학년, 상태, 오답허용률, 등원일정, "사전등원(분)", 보충일정, 현재단어장, 수업구성')
+        const [stData, , wbData, me] = await Promise.all([
+          fetchAllRows("students", '이름, 학교, 학년, 상태, 오답허용률, 등원일정, "사전등원(분)", 보충일정, 현재단어장, 수업구성, 로그인ID')
+            .then(r => { loginEnabled = true; return r; })
+            .catch(() => fetchAllRows("students", '이름, 학교, 학년, 상태, 오답허용률, 등원일정, "사전등원(분)", 보충일정, 현재단어장, 수업구성'))
             .catch(() => fetchAllRows("students", '이름, 학교, 학년, 상태, 오답허용률, 등원일정, "사전등원(분)", 보충일정, 현재단어장'))
             .catch(() => fetchAllRows("students", '이름, 학교, 학년, 상태, 오답허용률, 등원일정, "사전등원(분)", 보충일정')),
           loadRankingData(),
-          loadWordbookSmart(false)
+          loadWordbookSmart(false),
+          getLoggedInUser()
         ]);
 
         allStudents = stData || [];
@@ -821,6 +859,12 @@
 
         document.getElementById("globalLoader").classList.add("hidden");
 
+        // 로그인 사용 중이면: 이 기기에 로그인해 둔 학생만 열기 (이름만 기억된 것은 무시)
+        if (loginEnabled) {
+          currentStudent = me && activeList.includes(me.name) ? me.name : "";
+          selectEl.value = currentStudent;
+        }
+
         if (currentStudent && activeList.includes(currentStudent)) {
           localStorage.setItem("pqrs_student", currentStudent);
           await loadStudentPersonalData(currentStudent);
@@ -832,6 +876,8 @@
 
         switchTab(currentTab, { noScroll: true });
         restoreOngoingExamIfAny();
+        updateLoginButtons();
+        if (loginEnabled && currentStudent && me && !me.changed) openPwModal(true);
       } catch (err) {
         alert("데이터를 불러오는 중 일시적 네트워크 오류가 발생했습니다. 화면을 새로고침 해주세요: " + err.message);
       }
@@ -871,9 +917,155 @@
       document.getElementById("examEnd").value = Math.max(...nums);
     }
 
+    // ------------------------------------------
+    // 학생 로그인 (이름 + 비밀번호)
+    // 로그인ID 칸에 계정 주소 전체가 들어 있음 (@ 없는 예전 값이면 아래 주소를 붙임)
+    // STUDENT_PW_PREFIX 는 관리자 페이지 app.py 의 값과 같아야 합니다.
+    // ------------------------------------------
+    const STUDENT_LOGIN_DOMAIN = "pqrs.example.com";
+    const STUDENT_PW_PREFIX = "pqrs#";
+    let loginEnabled = false;   // students.로그인ID 칸이 있으면 비밀번호로 들어감
+    let loginTarget = "";
+    let lastLoginPw = "";
+    let pwForced = false;
+
+    function loginIdOf(name) {
+      const s = allStudents.find(x => x.이름 === name);
+      return s && s.로그인ID ? String(s.로그인ID) : "";
+    }
+
+    // 이 기기에 로그인해 둔 학생 { name, changed(처음 비번을 바꿨는지) } / 없으면 null
+    async function getLoggedInUser() {
+      try {
+        const { data } = await db.auth.getSession();
+        if (!data || !data.session) return null;
+        const { data: info, error } = await db.rpc("my_login_info");
+        if (error || !info || !info.length) return null;
+        return { name: info[0].이름, changed: !!info[0].비번바꿈 };
+      } catch (e) { return null; }
+    }
+
+    function updateLoginButtons() {
+      document.getElementById("loginBar").classList.toggle("hidden", !(loginEnabled && !!currentStudent));
+    }
+
+    function showErr(id, msg) {
+      const el = document.getElementById(id);
+      el.textContent = msg;
+      el.classList.toggle("hidden", !msg);
+    }
+
+    function openLogin(name) {
+      loginTarget = name;
+      const hasId = !!loginIdOf(name);
+      document.getElementById("loginTitle").textContent = `🔒 ${name}`;
+      const pw = document.getElementById("loginPw");
+      pw.value = "";
+      pw.disabled = !hasId;
+      document.getElementById("loginBtn").disabled = !hasId;
+      showErr("loginErr", hasId ? "" : "아직 비밀번호가 없어요. 선생님께 처음 비밀번호(4자리)를 받아 주세요.");
+      document.getElementById("loginModal").classList.remove("hidden");
+      if (hasId) setTimeout(() => pw.focus(), 50);
+    }
+
+    function closeLogin() {
+      document.getElementById("loginModal").classList.add("hidden");
+      document.getElementById("studentSelect").value = currentStudent;
+    }
+
+    async function submitLogin() {
+      const pw = document.getElementById("loginPw").value;
+      const lid = loginIdOf(loginTarget);
+      if (!pw || !lid) return;
+      const btn = document.getElementById("loginBtn");
+      btn.disabled = true; btn.textContent = "확인 중...";
+      try {
+        const email = lid.includes("@") ? lid : `${lid}@${STUDENT_LOGIN_DOMAIN}`;
+        const { error } = await db.auth.signInWithPassword({ email, password: STUDENT_PW_PREFIX + pw });
+        if (error) {
+          const m = String(error.message || "");
+          showErr("loginErr", /invalid/i.test(m) || error.code === "invalid_credentials" ? "비밀번호가 맞지 않아요. 다시 확인해 주세요."
+            : /rate|too many/i.test(m) ? "너무 여러 번 시도했어요. 잠시 후 다시 해 주세요." : "로그인 오류: " + m);
+          return;
+        }
+        const me = await getLoggedInUser();
+        if (!me || me.name !== loginTarget) {
+          await db.auth.signOut();
+          showErr("loginErr", "이 이름의 계정을 찾지 못했어요. 선생님께 말씀해 주세요.");
+          return;
+        }
+        lastLoginPw = pw;
+        document.getElementById("loginModal").classList.add("hidden");
+        document.getElementById("studentSelect").value = me.name;
+        await enterStudent(me.name);
+        if (!me.changed) openPwModal(true);
+      } finally {
+        btn.disabled = false; btn.textContent = "들어가기";
+      }
+    }
+
+    async function studentLogout() {
+      try { await db.auth.signOut(); } catch (e) {}
+      document.getElementById("studentSelect").value = "";
+      await enterStudent("");
+    }
+
+    // forced: 처음 비번으로 들어왔을 때 (취소 불가)
+    function openPwModal(forced) {
+      pwForced = !!forced;
+      document.getElementById("pwNew1").value = "";
+      document.getElementById("pwNew2").value = "";
+      showErr("pwErr", "");
+      document.getElementById("pwHint").textContent = forced
+        ? "처음 비번은 선생님도 알고 있어요. 나만 아는 비밀번호로 바꿔 주세요. (4자 이상)"
+        : "나만 아는 비밀번호로 정해 주세요. (4자 이상)";
+      document.getElementById("pwLaterBtn").classList.toggle("hidden", pwForced);
+      document.getElementById("pwModal").classList.remove("hidden");
+      setTimeout(() => document.getElementById("pwNew1").focus(), 50);
+    }
+
+    function closePwModal() {
+      if (pwForced) return;
+      document.getElementById("pwModal").classList.add("hidden");
+    }
+
+    async function submitNewPw() {
+      const a = document.getElementById("pwNew1").value;
+      const b = document.getElementById("pwNew2").value;
+      if (a.length < 4) return showErr("pwErr", "4자 이상으로 정해 주세요.");
+      if (a !== b) return showErr("pwErr", "두 칸에 넣은 비밀번호가 서로 달라요.");
+      if (pwForced && lastLoginPw && a === lastLoginPw) return showErr("pwErr", "처음 비번과 다른 비밀번호로 정해 주세요.");
+      const btn = document.getElementById("pwSaveBtn");
+      btn.disabled = true; btn.textContent = "저장 중...";
+      try {
+        const { error } = await db.auth.updateUser({ password: STUDENT_PW_PREFIX + a });
+        if (error) {
+          const m = String(error.message || "");
+          return showErr("pwErr", /different|same/i.test(m) ? "지금 비밀번호와 다르게 정해 주세요." : "저장 오류: " + m);
+        }
+        await db.rpc("mark_password_changed");
+        lastLoginPw = "";
+        pwForced = false;
+        document.getElementById("pwModal").classList.add("hidden");
+        alert("✅ 비밀번호를 바꿨어요! 다음부터 이 비밀번호로 들어오세요.");
+      } finally {
+        btn.disabled = false; btn.textContent = "저장";
+      }
+    }
+
     async function onStudentChange() {
-      if (G) { stopGameTimers(); G = null; showGameChrome(true); }
       const selected = document.getElementById("studentSelect").value;
+      if (loginEnabled && selected !== currentStudent) {
+        document.getElementById("studentSelect").value = currentStudent;   // 로그인 성공 전까지는 그대로
+        if (!selected) await studentLogout();
+        else openLogin(selected);
+        return;
+      }
+      await enterStudent(selected);
+    }
+
+    async function enterStudent(selected) {
+      if (G) { stopGameTimers(); G = null; showGameChrome(true); }
       currentStudent = selected;
       unsavedStudySeconds = 0;
       coreActive = null;
@@ -890,6 +1082,7 @@
         document.getElementById("studentDashboard").classList.add("hidden");
       }
       switchTab(currentTab, { noScroll: true });
+      updateLoginButtons();
     }
 
     async function loadStudentPersonalData(stName) {
