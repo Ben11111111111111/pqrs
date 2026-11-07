@@ -66,8 +66,8 @@
       <div class="flex items-center space-x-2">
         <span class="text-2xl">🎓</span>
         <div>
-          <h1 class="text-base md:text-xl font-bold tracking-tight">PQRS 영쌤 학습센터</h1>
-          <p id="liveStudyTimeBadge" class="hidden text-[11px] text-yellow-300 font-bold">⏱️ 오늘 공부시간 측정중: 0분 00초</p>
+          <h1 class="text-base md:text-xl font-bold tracking-tight whitespace-nowrap">PQRS 영쌤 학습센터</h1>
+          <p id="liveStudyTimeBadge" class="hidden text-[11px] text-yellow-300 font-bold truncate max-w-[11rem] md:max-w-none">⏱️ 오늘 0분 00초</p>
         </div>
       </div>
       <div class="flex items-center space-x-2">
@@ -82,6 +82,12 @@
       <button onclick="switchTab('exam')" id="tabBtn_exam" class="flex-1 py-3 text-center border-b-4 border-transparent text-blue-200">⏱️ 단어시험</button>
       <button onclick="switchTab('core')" id="tabBtn_core" class="flex-1 py-3 text-center border-b-4 border-transparent text-blue-200">📝 CORE</button>
     </div>
+    <div id="teacherBar" class="hidden bg-amber-400 text-blue-950 text-xs font-bold">
+      <div class="max-w-4xl mx-auto px-4 py-1.5 flex items-center justify-between gap-2">
+        <span>👩‍🏫 선생님 보기 모드 · 위에서 학생을 고르세요 <span class="font-medium">(기록은 저장되지 않아요)</span></span>
+        <button onclick="teacherLogout()" class="shrink-0 underline">로그아웃</button>
+      </div>
+    </div>
   </header>
 
   <div id="loginModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center px-4">
@@ -95,6 +101,33 @@
         <button id="loginBtn" type="submit" class="flex-1 py-2.5 rounded-lg bg-blue-900 text-white font-extrabold">들어가기</button>
       </div>
       <p class="mt-3 text-[11px] text-slate-500">처음이면 선생님께 받은 4자리를 넣으세요. 비밀번호를 잊었으면 선생님께 말씀하세요.</p>
+    </form>
+  </div>
+
+  <div id="helpModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 flex items-end md:items-center justify-center" onclick="if(event.target===this)closeHelp()">
+    <div class="bg-white w-full max-w-lg rounded-t-2xl md:rounded-2xl shadow-xl max-h-[88vh] flex flex-col">
+      <div class="flex items-center justify-between px-5 pt-4 pb-2">
+        <p class="text-lg font-extrabold text-blue-950">❓ 학습센터 사용법</p>
+        <button onclick="closeHelp()" class="text-slate-500 text-xl px-2" aria-label="닫기">✕</button>
+      </div>
+      <div id="helpBody" class="px-5 pb-3 overflow-y-auto text-sm text-slate-700 space-y-3"></div>
+      <div class="px-5 pb-5 pt-2"><button onclick="closeHelp()" class="w-full py-3 rounded-xl bg-blue-900 text-white font-extrabold">알겠어요!</button></div>
+    </div>
+  </div>
+
+  <div id="teacherModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center px-4">
+    <form onsubmit="event.preventDefault(); submitTeacherLogin();" class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5">
+      <p class="text-lg font-extrabold text-blue-950">👩‍🏫 선생님 로그인</p>
+      <p class="text-xs text-slate-500 mt-1">관리자 프로그램에서 만든 선생님 계정으로 들어가면, 모든 학생의 화면을 골라 볼 수 있어요.</p>
+      <input id="teacherEmail" type="email" autocomplete="username" placeholder="선생님 이메일"
+             class="mt-3 w-full border-2 border-slate-300 rounded-lg px-3 py-2.5 text-base focus:border-blue-700 outline-none">
+      <input id="teacherPw" type="password" autocomplete="current-password" placeholder="비밀번호"
+             class="mt-2 w-full border-2 border-slate-300 rounded-lg px-3 py-2.5 text-base focus:border-blue-700 outline-none">
+      <p id="teacherErr" class="hidden mt-2 text-sm font-bold text-rose-600"></p>
+      <div class="mt-4 flex gap-2">
+        <button type="button" onclick="document.getElementById('teacherModal').classList.add('hidden')" class="flex-1 py-2.5 rounded-lg bg-slate-100 font-bold text-slate-700">취소</button>
+        <button id="teacherBtn" type="submit" class="flex-1 py-2.5 rounded-lg bg-blue-900 text-white font-extrabold">들어가기</button>
+      </div>
     </form>
   </div>
 
@@ -122,9 +155,12 @@
     </div>
 
     <section id="studentDashboard" class="hidden mb-5 space-y-3">
-      <div id="loginBar" class="hidden flex justify-end gap-3 -mb-1 text-xs font-bold text-slate-500">
+      <div class="flex justify-end gap-3 -mb-1 text-xs font-bold text-slate-500">
+        <button onclick="openHelp()" class="hover:text-blue-900">❓ 사용법</button>
+        <span id="loginBar" class="hidden flex gap-3">
         <button id="pwChangeBtn" onclick="openPwModal(false)" class="hover:text-blue-900">🔑 비밀번호 바꾸기</button>
         <button id="logoutBtn" onclick="studentLogout()" class="hover:text-blue-900">🚪 로그아웃</button>
+        </span>
       </div>
       <div id="dashStrip" class="grid grid-cols-2 md:grid-cols-4 gap-2.5">
         <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
@@ -157,10 +193,7 @@
       </div>
     </section>
 
-    <div id="noNameWarning" class="hidden bg-amber-50 border-2 border-amber-300 rounded-xl p-6 text-center my-6 shadow-sm">
-      <p class="text-base md:text-lg font-extrabold text-amber-900">👆 화면 오른쪽 위에서 '내 이름'을 먼저 선택해 주세요!</p>
-      <p class="text-xs text-amber-700 mt-1.5">내 이름을 선택하고 공부해야 나의 단어 공부 시간(분)이 자동으로 기록됩니다.</p>
-    </div>
+    <div id="noNameWarning" class="hidden pq-card p-5 my-4 border-2 border-amber-300"></div>
 
     <!-- 탭: 🏠 내 현황 -->
     <section id="tabContent_my" class="hidden space-y-3">
@@ -410,9 +443,13 @@
     const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     const SAME_RANGE_COOLDOWN_DAYS = 7;
-    const WORDBOOK_CACHE_KEY = "pqrs_wb_cache_v2";
-    const WORDBOOK_CACHE_TIME_KEY = "pqrs_wb_cache_time_v2";
-    const WORDBOOK_CACHE_TTL_MS = 30 * 60 * 1000;
+    const WORDBOOK_CACHE_KEY = "pqrs_wb_cache_v3";
+    const WORDBOOK_CACHE_TIME_KEY = "pqrs_wb_cache_time_v3";
+    const WORDBOOK_CACHE_VER_KEY = "pqrs_wb_cache_ver_v3";
+    const WORDBOOK_CACHE_TTL_MS = 30 * 60 * 1000;          // 바뀜 확인이 안 될 때 다시 받는 간격
+    const WORDBOOK_CACHE_MAX_MS = 7 * 24 * 3600 * 1000;    // 바뀌지 않았어도 7일에 한 번은 새로
+    const WORDBOOK_COLS = "분류, 단어번호, 영어단어, 뜻, 발음기호, 한글발음, 예문";
+    try { ["pqrs_wb_cache_v2", "pqrs_wb_cache_time_v2"].forEach(k => localStorage.removeItem(k)); } catch (e) {}
 
     let allStudents = [];
     let allWordbook = [];
@@ -471,7 +508,7 @@
     // 1초마다 실제 공부 중인지 확인하여 공부 시간 누적 & 60초마다 DB 자동 저장
     setInterval(async () => {
       const badge = document.getElementById("liveStudyTimeBadge");
-      if (!currentStudent) {
+      if (!currentStudent || isTeacherView()) {
         if (badge) badge.classList.add("hidden");
         return;
       }
@@ -490,10 +527,11 @@
       const s = String(activeStudySecondsToday % 60).padStart(2, "0");
       if (badge) {
         badge.textContent = (isPageVisible && isStudyingTab && isRecentlyActive)
-          ? `⏱️ 공부시간 측정중: 오늘 ${m}분 ${s}초`
+          ? `⏱️ 공부 중 · 오늘 ${m}분 ${s}초`
           : (isPageVisible && isStudyingTab)
-            ? `⏸️ 1분간 활동이 없어 공부시간 멈춤 (화면을 터치하면 다시 측정): 오늘 ${m}분 ${s}초`
-            : `⏸️ 공부시간 일시정지 (암기장·시험·CORE 탭에서 작동): 오늘 ${m}분 ${s}초`;
+            ? `⏸️ 멈춤(터치하면 다시) · 오늘 ${m}분`
+            : `⏸️ 오늘 ${m}분 · 암기장·시험·CORE에서 측정`;
+        badge.title = "암기장·단어시험·CORE 탭에서 화면을 쓰는 동안 1분 단위로 공부시간이 기록돼요 (1분간 터치가 없으면 멈춤, 하루 최대 3시간)";
       }
 
       if (unsavedStudySeconds >= 60 && !isSavingStudyTime) {
@@ -504,7 +542,7 @@
     }, 1000);
 
     async function recordStudyMinutesToServer(stName, addMins) {
-      if (!stName || addMins <= 0) return;
+      if (!stName || addMins <= 0 || isTeacherView()) return;
       isSavingStudyTime = true;
       try {
         const todayStr = getKSTDateString();
@@ -696,12 +734,14 @@
       } catch (e) { return text; }
     }
 
-    async function fetchAllRows(tableName, selectCols = "*") {
+    async function fetchAllRows(tableName, selectCols = "*", filter = null) {
       let allData = [];
       let from = 0;
       const step = 1000;
       while (true) {
-        const { data, error } = await db.from(tableName).select(selectCols).range(from, from + step - 1);
+        let q = db.from(tableName).select(selectCols);
+        if (filter) q = filter(q);
+        const { data, error } = await q.range(from, from + step - 1);
         if (error) throw error;
         if (!data || data.length === 0) break;
         allData = allData.concat(data);
@@ -726,20 +766,35 @@
       return { data: all, error: null };
     }
 
+    // 단어장이 바뀌었는지 가볍게 확인 (일반 단어 수 + 가장 큰 번호). 확인할 수 없으면 null
+    async function wordbookVersion() {
+      try {
+        const [c, m] = await Promise.all([
+          db.from("wordbook").select("id", { count: "exact", head: true }).not("분류", "like", "[CORE%"),
+          db.from("wordbook").select("id").not("분류", "like", "[CORE%").order("id", { ascending: false }).limit(1)
+        ]);
+        if (c.error || m.error || typeof c.count !== "number") return null;
+        return `${c.count}:${(m.data && m.data[0] && m.data[0].id) || 0}`;
+      } catch (e) { return null; }
+    }
+
+    // [속도 개선] 일반 단어장만(CORE 문제은행 제외), 필요한 칸만 받고, 바뀌지 않았으면 휴대폰에 저장된 것을 씁니다
     async function loadWordbookSmart(forceRefresh = false) {
+      const ver = await wordbookVersion();
       if (!forceRefresh) {
         try {
           const cachedTime = parseInt(localStorage.getItem(WORDBOOK_CACHE_TIME_KEY), 10) || 0;
+          const cachedVer = localStorage.getItem(WORDBOOK_CACHE_VER_KEY) || "";
           const cachedJson = localStorage.getItem(WORDBOOK_CACHE_KEY);
-          if (cachedJson && (Date.now() - cachedTime < WORDBOOK_CACHE_TTL_MS)) {
+          const age = Date.now() - cachedTime;
+          const fresh = ver ? (ver === cachedVer && age < WORDBOOK_CACHE_MAX_MS) : age < WORDBOOK_CACHE_TTL_MS;
+          if (cachedJson && fresh) {
             const parsed = JSON.parse(cachedJson);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              return parsed;
-            }
+            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
           }
         } catch (e) {}
       }
-      const wbData = await fetchAllRows("wordbook", "*");
+      const wbData = await fetchAllRows("wordbook", WORDBOOK_COLS, q => q.not("분류", "like", "[CORE%"));
       const formatted = (wbData || []).filter(w => !String(w.분류 || "").startsWith("[CORE")).map(w => ({
         ...w,
         단어번호: parseInt(w.단어번호, 10) || 0,
@@ -749,6 +804,7 @@
       try {
         localStorage.setItem(WORDBOOK_CACHE_KEY, JSON.stringify(formatted));
         localStorage.setItem(WORDBOOK_CACHE_TIME_KEY, String(Date.now()));
+        localStorage.setItem(WORDBOOK_CACHE_VER_KEY, ver || "");
       } catch (e) {}
       return formatted;
     }
@@ -815,6 +871,7 @@
     }
 
     async function safeInsert(tableName, rowObj, retries = 4) {
+      if (isTeacherView()) return true;   // 선생님 보기: 저장하지 않음
       for (let i = 0; i < retries; i++) {
         const { error } = await db.from(tableName).insert(rowObj);
         if (!error) return true;
@@ -861,12 +918,14 @@
         document.getElementById("globalLoader").classList.add("hidden");
 
         // 로그인 사용 중이면: 이 기기에 로그인해 둔 학생만 열기 (이름만 기억된 것은 무시)
-        if (loginEnabled) {
+        if (loginEnabled && me && me.teacher) {
+          enterTeacherMode();
+        } else if (loginEnabled) {
           currentStudent = me && activeList.includes(me.name) ? me.name : "";
           selectEl.value = currentStudent;
         }
 
-        if (currentStudent && activeList.includes(currentStudent)) {
+        if (currentStudent && viewableNames().includes(currentStudent)) {
           localStorage.setItem("pqrs_student", currentStudent);
           await loadStudentPersonalData(currentStudent);
           applyMyDefaultWordbook();
@@ -878,7 +937,8 @@
         switchTab(currentTab, { noScroll: true });
         restoreOngoingExamIfAny();
         updateLoginButtons();
-        if (loginEnabled && currentStudent && me && !me.changed) openPwModal(true);
+        if (loginEnabled && currentStudent && me && !me.teacher && !me.changed) openPwModal(true);
+        else maybeShowHelpOnce();
       } catch (err) {
         alert("데이터를 불러오는 중 일시적 네트워크 오류가 발생했습니다. 화면을 새로고침 해주세요: " + err.message);
       }
@@ -941,13 +1001,137 @@
         const { data } = await db.auth.getSession();
         if (!data || !data.session) return null;
         const { data: info, error } = await db.rpc("my_login_info");
-        if (error || !info || !info.length) return null;
-        return { name: info[0].이름, changed: !!info[0].비번바꿈 };
+        if (!error && info && info.length) return { name: info[0].이름, changed: !!info[0].비번바꿈 };
+        const t = await db.rpc("is_teacher");
+        if (!t.error && t.data === true) return { teacher: true };
+        return null;
       } catch (e) { return null; }
     }
 
     function updateLoginButtons() {
-      document.getElementById("loginBar").classList.toggle("hidden", !(loginEnabled && !!currentStudent));
+      document.getElementById("loginBar").classList.toggle("hidden", !(loginEnabled && !!currentStudent && !isTeacherView()));
+      document.getElementById("teacherBar").classList.toggle("hidden", !isTeacherView());
+    }
+
+    // ------------------------------------------
+    // 선생님 보기 모드: 선생님 계정으로 로그인하면 모든 학생 화면을 골라 볼 수 있음 (보기만, 저장 안 함)
+    // ------------------------------------------
+    let viewerRole = "";
+    function isTeacherView() { return viewerRole === "teacher"; }
+
+    function fillStudentSelect(names, labelOf = n => n) {
+      const selectEl = document.getElementById("studentSelect");
+      selectEl.innerHTML = `<option value="">${isTeacherView() ? "👩‍🏫 학생 선택" : "👉 내 이름 선택"}</option>`;
+      names.forEach(name => {
+        const opt = document.createElement("option");
+        opt.value = name;
+        opt.textContent = labelOf(name);
+        selectEl.appendChild(opt);
+      });
+      selectEl.value = names.includes(currentStudent) ? currentStudent : "";
+    }
+
+    function viewableNames() {
+      const order = { "재원": 0, "휴원": 1, "퇴원": 2 };
+      const list = isTeacherView() ? allStudents : allStudents.filter(s => s.상태 === "재원");
+      return list.slice().sort((a, b) => ((order[a.상태] ?? 3) - (order[b.상태] ?? 3)) || String(a.이름).localeCompare(String(b.이름), "ko")).map(s => s.이름);
+    }
+
+    function enterTeacherMode() {
+      viewerRole = "teacher";
+      let saved = "";
+      try { saved = localStorage.getItem("pqrs_teacher_view") || ""; } catch (e) {}
+      const names = viewableNames();
+      currentStudent = names.includes(saved) ? saved : "";
+      const st = n => (allStudents.find(s => s.이름 === n) || {}).상태;
+      fillStudentSelect(names, n => st(n) && st(n) !== "재원" ? `${n} (${st(n)})` : n);
+      updateLoginButtons();
+    }
+
+    function openTeacherLogin() {
+      showErr("teacherErr", "");
+      document.getElementById("teacherPw").value = "";
+      document.getElementById("teacherModal").classList.remove("hidden");
+      setTimeout(() => document.getElementById("teacherEmail").focus(), 50);
+    }
+
+    async function submitTeacherLogin() {
+      const email = document.getElementById("teacherEmail").value.trim();
+      const pw = document.getElementById("teacherPw").value;
+      if (!email || !pw) return;
+      const btn = document.getElementById("teacherBtn");
+      btn.disabled = true; btn.textContent = "확인 중...";
+      try {
+        const { error } = await db.auth.signInWithPassword({ email, password: pw });
+        if (error) return showErr("teacherErr", /invalid/i.test(String(error.message)) ? "이메일 또는 비밀번호가 맞지 않아요." : "로그인 오류: " + error.message);
+        const t = await db.rpc("is_teacher");
+        if (t.error || t.data !== true) {
+          await db.auth.signOut();
+          return showErr("teacherErr", "선생님 계정이 아니에요. 관리자 프로그램에서 선생님 계정을 먼저 만들어 주세요.");
+        }
+        document.getElementById("teacherModal").classList.add("hidden");
+        enterTeacherMode();
+        await enterStudent(currentStudent);
+      } finally {
+        btn.disabled = false; btn.textContent = "들어가기";
+      }
+    }
+
+    async function teacherLogout() {
+      try { await db.auth.signOut(); } catch (e) {}
+      viewerRole = "";
+      currentStudent = "";
+      fillStudentSelect(viewableNames());
+      await enterStudent("");
+    }
+
+    // ------------------------------------------
+    // 처음 화면 안내 · 사용법
+    // ------------------------------------------
+    function renderWelcome() {
+      const box = document.getElementById("noNameWarning");
+      if (isTeacherView()) {
+        box.innerHTML = `<p class="text-lg font-extrabold text-blue-950">👩‍🏫 선생님 보기 모드</p>
+          <p class="mt-2 text-sm text-slate-700">화면 오른쪽 위에서 <b>학생 이름</b>을 고르면, 그 학생이 보는 화면을 그대로 볼 수 있어요. 시험·게임을 눌러 봐도 기록은 저장되지 않아요.</p>`;
+        return;
+      }
+      const steps = loginEnabled
+        ? [["오른쪽 위 <b>'내 이름'</b>을 눌러 이름을 골라요."], ["<b>비밀번호</b>를 넣어요. 처음이면 선생님께 받은 번호예요."], ["처음이면 <b>나만 아는 비밀번호</b>로 바꿔요. 다음부터 이 휴대폰에서는 자동으로 들어와요."]]
+        : [["오른쪽 위 <b>'내 이름'</b>을 눌러 이름을 골라요."], ["<b>내 현황</b>에서 오늘 할 일을 확인해요."], ["암기장·단어시험·CORE에서 공부하면 <b>공부시간이 자동으로</b> 기록돼요."]];
+      box.innerHTML = `<p class="text-lg font-extrabold text-blue-950">👋 PQRS 영쌤 학습센터에 오신 걸 환영해요!</p>
+        <ol class="mt-3 space-y-2">${steps.map((t, i) => `<li class="flex gap-2.5 text-sm text-slate-700"><span class="shrink-0 w-6 h-6 rounded-full bg-blue-900 text-white text-xs font-black flex items-center justify-center">${i + 1}</span><span class="pt-0.5">${t[0]}</span></li>`).join("")}</ol>
+        <div class="mt-4 grid grid-cols-2 gap-2">
+          <button onclick="openHelp()" class="py-2.5 rounded-xl bg-blue-900 text-white text-sm font-extrabold">❓ 사용법 보기</button>
+          <button onclick="switchTab('rank')" class="py-2.5 rounded-xl bg-slate-100 text-slate-700 text-sm font-bold">🏆 랭킹 먼저 보기</button>
+        </div>
+        ${loginEnabled ? `<div class="mt-4 text-right"><button onclick="openTeacherLogin()" class="text-[11px] text-slate-400 underline">👩‍🏫 선생님 로그인</button></div>` : ""}`;
+    }
+
+    const HELP_SECTIONS = [
+      ["🏠 내 현황", "오늘 할 일(재시험·과제·CORE), 이번 주 수업과 <b>내 단어시험 범위</b>, 다가오는 수업 시간, 내 포인트가 한 화면에 나와요."],
+      ["📇 암기장", "<b>카드 암기</b>: 카드를 누르면 뜻이 보여요. 🔊로 발음 듣기, ☆ 담기로 <b>나만의 단어장</b>에 저장.<br><b>단어 게임</b>: 타임어택·서바이벌·짝 맞추기. 성공할 때마다 +0.125P (하루 최대 1P)."],
+      ["⏱️ 단어시험", "<b>연습 모드</b>는 기록 없이 연습, <b>실전 모드</b>는 성적이 선생님께 전송돼요. 본시험 통과 +1P.<br>통과 못 한 범위는 <b>재시 버튼</b>이 생겨요. 24시간 안에 재시 통과하면 +0.5P."],
+      ["📝 CORE", "선생님이 낸 기출 문제 과제예요. 마감은 <b>마감일 밤 10시</b>, 최대 3번 도전, 90점 이상이면 통과.<br>1번 만에 +0.5P · 2번째 +0.25P · 3번째 +0.125P. 마감 후 7일까지는 늦게 낼 수 있어요(포인트 절반)."],
+      ["🏆 랭킹", "<b>나의 순위</b>(같은 학교·학년과 비교, 친구 이름은 가려져요), 공부시간왕, 장학금 명예의 전당."],
+      ["⏱️ 공부시간", "암기장·단어시험·CORE 탭에서 화면을 쓰는 동안 1분 단위로 자동 기록돼요. 1분 동안 터치가 없으면 멈추고, 하루 최대 3시간까지 인정돼요."],
+      ["💎 장학금", "포인트 <b>50P</b>를 모으면 장학금 <b>25,000원</b>! 꾸준히 공부하면 시크릿 선물도 있어요."]
+    ];
+
+    function openHelp() {
+      document.getElementById("helpBody").innerHTML = HELP_SECTIONS.map(([h, t]) =>
+        `<div class="rounded-xl bg-slate-50 border border-slate-200 p-3"><p class="font-extrabold text-blue-950">${h}</p><p class="mt-1 text-[13px] leading-relaxed">${t}</p></div>`).join("");
+      document.getElementById("helpModal").classList.remove("hidden");
+    }
+
+    function closeHelp() {
+      document.getElementById("helpModal").classList.add("hidden");
+      try { localStorage.setItem("pqrs_help_seen", "1"); } catch (e) {}
+    }
+
+    function maybeShowHelpOnce() {
+      let seen = "1";
+      try { seen = localStorage.getItem("pqrs_help_seen") || ""; } catch (e) {}
+      if (!seen && currentStudent && !isTeacherView() && document.getElementById("pwModal").classList.contains("hidden")) openHelp();
     }
 
     function showErr(id, msg) {
@@ -1000,6 +1184,7 @@
         document.getElementById("studentSelect").value = me.name;
         await enterStudent(me.name);
         if (!me.changed) openPwModal(true);
+        else maybeShowHelpOnce();
       } finally {
         btn.disabled = false; btn.textContent = "들어가기";
       }
@@ -1058,6 +1243,7 @@
         pwForced = false;
         document.getElementById("pwModal").classList.add("hidden");
         alert("✅ 비밀번호를 바꿨어요! 다음부터 이 비밀번호로 들어오세요.");
+        maybeShowHelpOnce();
       } finally {
         btn.disabled = false; btn.textContent = "저장";
       }
@@ -1065,6 +1251,12 @@
 
     async function onStudentChange() {
       const selected = document.getElementById("studentSelect").value;
+      if (isTeacherView()) {
+        if (!selected) { document.getElementById("studentSelect").value = currentStudent; return; }
+        try { localStorage.setItem("pqrs_teacher_view", selected); } catch (e) {}
+        await enterStudent(selected);
+        return;
+      }
       if (loginEnabled && selected !== currentStudent) {
         document.getElementById("studentSelect").value = currentStudent;   // 로그인 성공 전까지는 그대로
         if (!selected) await studentLogout();
@@ -1095,7 +1287,9 @@
       updateLoginButtons();
     }
 
+    let personalLoadSeq = 0;
     async function loadStudentPersonalData(stName) {
+      const seq = ++personalLoadSeq;
       if (myVocaOwner !== stName) loadMyVoca(stName);
       document.getElementById("studentDashboard").classList.remove("hidden");
       const stInfo = allStudents.find(s => s.이름 === stName) || {};
@@ -1110,6 +1304,7 @@
         fetchPaged(() => db.from("assignments").select("과제명, 결과, 날짜, 선생님메모").eq("이름", stName).order("id")),
         myGrade ? db.from("weekly_progress").select("*").eq("학년", myGrade) : Promise.resolve({ data: [] })
       ]);
+      if (seq !== personalLoadSeq || currentStudent !== stName) return;   // 그사이 다른 학생으로 바뀜
 
       const myPtData = ptRes.data || [];
       const myPts = myPtData.reduce((acc, cur) => acc + (parseFloat(cur.포인트증감) || 0), 0);
@@ -1297,6 +1492,7 @@
 
       const warnBox = document.getElementById("noNameWarning");
       if (tabName !== "rank" && !currentStudent) {
+        renderWelcome();
         warnBox.classList.remove("hidden");
       } else {
         warnBox.classList.add("hidden");
@@ -1496,7 +1692,7 @@
 
     function saveMyVoca() {
       const stName = myVocaOwner;
-      if (!stName) return myVocaSaving;
+      if (!stName || isTeacherView()) return myVocaSaving;
       const payload = "[MYVOCA_DATA]" + JSON.stringify(myVoca);
       myVocaSaving = myVocaSaving.then(async () => {
         if (myVocaOwner !== stName) return;
@@ -2389,6 +2585,11 @@
           update = { 선생님메모: `시도:${tryNo}/3 · 최근 ${score}점` };
         }
 
+        if (isTeacherView()) {
+          showCoreResult(qa, score, correct, passed, tryNo, "👩‍🏫 선생님 보기 모드라 결과는 저장되지 않았어요.");
+          coreActive = null;
+          return;
+        }
         let uq = db.from("assignments").update(update);
         if (liveRow.id !== undefined && liveRow.id !== null) {
           uq = uq.eq("id", liveRow.id);
@@ -3770,6 +3971,7 @@
     async function saveGameResult(g, score) {
       const today = getKSTDateString();
       if (g.student !== currentStudent) return "ℹ️ 게임 중에 이름이 바뀌어 기록을 저장하지 않았어요.";
+      if (isTeacherView()) return "👩‍🏫 선생님 보기 모드라 기록은 저장되지 않았어요.";
       const row = { 날짜: today, 이름: currentStudent, 모드: g.mode, 범위: `${g.cat} ${g.s}~${g.e}번`, 점수: score, 정답: g.correct, 오답: g.wrong };
       if (g.eventId) row.이벤트 = g.eventId;
       let saved = false;
