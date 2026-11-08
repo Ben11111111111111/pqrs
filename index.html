@@ -1436,6 +1436,11 @@
         if (currentTab === "my") renderMyOverview();
         if (currentTab === "flash" && flashMode === "game") renderGameHome(true);
       });
+      // 포인트 이벤트 안내 (선생님이 만든 이벤트, 1분 동안 다시 안 받음)
+      loadPointEvents().then(() => {
+        if (currentStudent !== stName) return;
+        if (currentTab === "my") renderMyOverview();
+      });
 
       const wkBox = document.getElementById("weeklyProgressBox");
       const planRows = wkRes.data || [];
@@ -2951,6 +2956,7 @@
       const d = String(desc || "");
       if (d.startsWith("[공부시간]")) return null;
       if (d.startsWith("[시크릿선물]")) return "🎁 시크릿 선물";
+      if (d.startsWith("[이벤트]")) return "🎉 이벤트";
       if (d.startsWith("단어 본시험")) return "📖 단어 본시험 통과";
       if (d.startsWith("재시험")) return "🔁 단어 재시험 통과";
       if (d.startsWith("CORE 과제")) return "📝 CORE 과제";
@@ -3476,6 +3482,19 @@
             act: () => { switchTab("flash"); switchFlashMode("game"); }, label: "참가하기", color: "bg-fuchsia-600 hover:bg-fuchsia-700" });
         });
       }
+      myPointEvents(stInfo).forEach(e => {
+        const reason = `[이벤트] ${String(e.제목 || "").trim()}`;
+        const pv = toNum(e.포인트);
+        const got = (pts || []).some(p => String(p.내역 || "").trim() === reason);
+        const until = String(e.종료일).slice(5).replace("-", "/");
+        if (got) {
+          todo.push({ cls: "bg-emerald-50 border-emerald-300", html: `🎉 <b>이벤트 포인트 받았어요!</b> ${escapeHtml(e.제목)} <b class="text-emerald-700">+${pv}P</b>` });
+          return;
+        }
+        const link = safeEventLink(e.링크);
+        todo.push({ cls: "bg-yellow-50 border-yellow-300", html: `🎉 <b>이벤트</b>: ${escapeHtml(e.제목)} <b class="text-emerald-700">+${pv}P</b><br><span class="text-xs text-slate-600">${e.설명 ? escapeHtml(e.설명) + " · " : ""}${escapeHtml(until)}까지</span>`,
+          act: link ? () => window.open(link, "_blank", "noopener") : null, label: "바로 가기", color: "bg-yellow-500 hover:bg-yellow-600" });
+      });
       const coreRows = (hw || []).filter(h => String(h.과제명 || "").startsWith("[CORE]")).map(h => ({ h, ph: corePhase(h) }));
       coreRows.filter(x => x.ph.phase === "open").sort((a, b) => String(a.h.날짜).localeCompare(String(b.h.날짜))).forEach(x => {
         todo.push({ cls: "bg-indigo-50 border-indigo-300", html: `📝 <b>CORE</b>: ${escapeHtml(coreTitleOf(x.h))}<br><span class="text-xs text-slate-600">${!Number.isFinite(x.ph.dday) ? "마감일 미정" : x.ph.dday <= 0 ? "<b class='text-rose-600'>오늘 밤 10시 마감!</b>" : `마감 ${escapeHtml(String(x.h.날짜).slice(5))} 밤 10시 (D-${x.ph.dday})`} · 도전 ${parseCoreAttempt(x.h.선생님메모)}/3</span>`,
@@ -3640,6 +3659,31 @@
         return gameData;
       })().catch(e => { console.warn("게임 순위 불러오기 실패", e); gameData.loading = null; gameData.at = Date.now(); gameData.ok = false; return gameData; });
       return gameData.loading;
+    }
+
+    // ---------- 🎉 포인트 이벤트 (선생님이 관리자 페이지 메뉴 6에서 만듦, 학생은 보기만) ----------
+    let pointEventData = { at: 0, list: [], loading: null };
+    async function loadPointEvents(force) {
+      if (!force && pointEventData.at && Date.now() - pointEventData.at < 60000) return pointEventData;
+      if (pointEventData.loading) return pointEventData.loading;
+      pointEventData.loading = (async () => {
+        const r = await db.from("point_events").select("*").gte("종료일", getKSTDateString());
+        pointEventData = { at: Date.now(), list: r.error ? [] : (r.data || []).filter(e => e.공개 !== false), loading: null };
+        return pointEventData;
+      })().catch(() => { pointEventData = { at: Date.now(), list: [], loading: null }; return pointEventData; });
+      return pointEventData.loading;
+    }
+    function myPointEvents(stInfo) {
+      const today = getKSTDateString();
+      const me = stInfo || allStudents.find(s => s.이름 === currentStudent) || {};
+      return (pointEventData.list || []).filter(e => String(e.시작일) <= today && today <= String(e.종료일)
+        && (!String(e.대상학교 || "").trim() || String(e.대상학교).trim() === String(me.학교 || "").trim())
+        && (!String(e.대상학년 || "").trim() || normGrade(e.대상학년) === normGrade(me.학년)))
+        .sort((a, b) => String(a.종료일).localeCompare(String(b.종료일)));
+    }
+    function safeEventLink(u) {
+      const s = String(u || "").trim();
+      return /^https:\/\/[^\s"'<>]+$/i.test(s) ? s : "";
     }
 
     function myActiveEvents() {
