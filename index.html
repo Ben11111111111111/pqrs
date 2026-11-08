@@ -3799,7 +3799,8 @@
       if (!cat || isNaN(s) || isNaN(e) || s > e) { alert("단어장과 번호 범위를 확인해 주세요."); return; }
       const words = gameWordsFor(cat, s, e);
       const need = mode === "짝맞추기" ? MATCH_PAIRS : 4;
-      if (words.length < need) { alert(`이 범위에는 단어가 ${words.length}개뿐이에요. ${need}개 이상인 범위를 골라 주세요.${ev ? " (선생님께 알려 주세요)" : ""}`); return; }
+      const have = mode === "짝맞추기" ? distinctMatchWords(words).length : words.length;
+      if (have < need) { alert(`이 범위에는 ${mode === "짝맞추기" ? "뜻이 서로 다른 " : ""}단어가 ${have}개뿐이에요. ${need}개 이상인 범위를 골라 주세요.${ev ? " (선생님께 알려 주세요)" : ""}`); return; }
       const pool = allWordbook.filter(w => w.분류 === cat && String(w.뜻 || "").trim());
       G = { mode, cat, s, e, words, pool: pool.length >= 8 ? pool : allWordbook.filter(w => String(w.뜻 || "").trim()),
             eventId: ev ? Number(ev.id) : null, eventTitle: ev ? ev.제목 : "", running: true, student: currentStudent,
@@ -3921,9 +3922,21 @@
     }
 
     // ---------- 짝 맞추기 ----------
+    // 영어나 뜻이 똑같은 단어가 두 쌍 나오면 어느 짝인지 알 수 없으므로 하나씩만
+    function distinctMatchWords(words) {
+      const seenEn = new Set(), seenKo = new Set(), out = [];
+      for (const w of words) {
+        const en = String(w.영어단어 || "").trim().toLowerCase(), ko = String(w.뜻 || "").trim();
+        if (!en || !ko || seenEn.has(en) || seenKo.has(ko)) continue;
+        seenEn.add(en); seenKo.add(ko); out.push(w);
+      }
+      return out;
+    }
+
     function startMatch() {
-      const n = Math.min(MATCH_PAIRS, G.words.length);
-      const picks = shuffleArray(G.words).slice(0, n);
+      const uniq = distinctMatchWords(shuffleArray(G.words));
+      const n = Math.min(MATCH_PAIRS, uniq.length);
+      const picks = uniq.slice(0, n);
       G.pairs = n;
       G.cards = shuffleArray([
         ...picks.map((w, i) => ({ id: i, side: "en", text: w.영어단어, w })),
