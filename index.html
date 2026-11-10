@@ -1428,18 +1428,18 @@
       renderRetakeQuickButtons();
 
       myData = { name: stName, stInfo, pts: myPtData, att: attData, hw: hwAll, tests: myVocabTests, plans: wkRes.data || [] };
-      if (currentTab === "my") renderMyOverview();
+      if (currentTab === "my") renderMyOverview(); else updateNotices(false);
       if (currentTab === "rank" && rankSubMode === "me") renderPeerBox(stInfo);
       // 게임 이벤트 알림용 (작은 요약표 4개, 1분 동안 다시 안 받음)
       loadGameData().then(() => {
         if (currentStudent !== stName) return;
-        if (currentTab === "my") renderMyOverview();
+        if (currentTab === "my") renderMyOverview(); else updateNotices(false);
         if (currentTab === "flash" && flashMode === "game") renderGameHome(true);
       });
       // 포인트 이벤트 안내 (선생님이 만든 이벤트, 1분 동안 다시 안 받음)
       loadPointEvents().then(() => {
         if (currentStudent !== stName) return;
-        if (currentTab === "my") renderMyOverview();
+        if (currentTab === "my") renderMyOverview(); else updateNotices(false);
       });
 
       const wkBox = document.getElementById("weeklyProgressBox");
@@ -1542,6 +1542,7 @@
         if (tabName === "my") renderMyOverview();
         if (tabName === "rank") switchRankSubTab(rankSubMode || (currentStudent ? "me" : "time"));
       }
+      if (tabName !== "my" || !currentStudent) updateNotices(false);
       // 탭을 누르면 위쪽 요약 카드는 그대로 두고, 그 탭 화면이 바로 보이도록 자동 스크롤 (처음 접속할 때는 안 함)
       if (!opts.noScroll) {
         const target = currentStudent || tabName === "rank" ? document.getElementById(`tabContent_${tabName}`) : warnBox;
@@ -2450,7 +2451,7 @@
         return `
           <div class="flex items-center justify-between gap-2 border border-slate-200 rounded-lg px-3 py-2.5 ${isActive ? "bg-white" : "bg-slate-50"}">
             <div class="min-w-0">
-              <p class="text-sm font-bold text-slate-900 break-keep">${escapeHtml(title)}</p>
+              <p class="text-sm font-bold text-slate-900 break-keep">${isActive && isFresh(hwNoticeKey(row)) ? NEW_BADGE : ""}${escapeHtml(title)}</p>
               <p class="text-[11px] text-slate-500 mt-0.5">마감 ${escapeHtml(deadline)} 밤 10시 · 도전 ${tries}/${CORE_MAX_TRIES} ${row.선생님메모 && row.선생님메모.includes("점") ? "· " + escapeHtml(String(row.선생님메모).split("·").slice(1).join("·").trim()) : ""}</p>
               <div class="mt-1">${badge}</div>
             </div>
@@ -3403,6 +3404,7 @@
       const { stInfo, pts, att, hw, tests } = myData;
       const today = getKSTDateString();
       const nowS = kstNowStamp();
+      updateNotices(true);
 
       // ---------- 📅 수업 일정 ----------
       const classes = myUpcomingClasses(stInfo, 14);
@@ -3431,6 +3433,8 @@
           `<span class="text-[11px] px-2 py-1 rounded-lg border ${c.ds === today ? "bg-blue-900 text-white border-blue-900" : "bg-slate-50 text-slate-700 border-slate-200"}">
             ${c.ds.slice(5).replace("-", "/")}(${c.wk}) ${escapeHtml(c.time)}${c.sess ? ` ${escapeHtml(c.sess)}` : ""}${c.early ? ` · 사전${c.early}분` : ""}${c.word ? `<br><span class="${c.ds === today ? "text-yellow-200" : "text-rose-600"}">📖 ${escapeHtml(c.word)}</span>` : ""}</span>`).join("") + `</div>`;
       }
+      const wkKey = weekPlanKey(stInfo, myData.plans);
+      if (isFresh(wkKey)) schHtml = `<p class="text-xs font-bold text-rose-600 mb-2">${NEW_BADGE}이번 주 수업·단어시험 계획이 새로 올라왔어요</p>` + schHtml;
       document.getElementById("mySchedule").innerHTML = schHtml;
 
       // ---------- ✅ 지금 챙겨야 할 것 ----------
@@ -3472,48 +3476,48 @@
       }
       (myRetakes || []).forEach(r => {
         todo.push({ cls: "bg-rose-50 border-rose-300", html: `🚨 <b>단어 재시</b>: ${escapeHtml(r.range)} <span class="text-xs text-slate-500">(${escapeHtml(r.date)})</span><br><span class="text-[11px] text-slate-600">24시간 안에 통과하면 +0.5P</span>`,
-          act: () => goRetake(r.range), label: "재시 보기", color: "bg-rose-600 hover:bg-rose-700" });
+          act: () => goRetake(r.range), label: "재시 보기", color: "bg-rose-600 hover:bg-rose-700", nk: `re|${r.range}|${r.date}` });
       });
       if (gameData.at) {
         myActiveEvents().forEach(e => {
-          const joined = (gameData.eventBest || []).some(x => String(x.event_id) === String(e.id) && x.이름 === currentStudent);
-          if (joined) return;
+          if (gameEventJoined(e)) return;
           todo.push({ cls: "bg-fuchsia-50 border-fuchsia-300", html: `🎯 <b>단어 게임 이벤트</b>: ${escapeHtml(e.제목)}<br><span class="text-xs text-slate-600">${escapeHtml(String(e.종료일).slice(5).replace("-", "/"))}까지 · ${escapeHtml(e.분류)} ${toNum(e.시작번호)}~${toNum(e.끝번호)}번</span>`,
-            act: () => { switchTab("flash"); switchFlashMode("game"); }, label: "참가하기", color: "bg-fuchsia-600 hover:bg-fuchsia-700" });
+            act: () => { switchTab("flash"); switchFlashMode("game"); }, label: "참가하기", color: "bg-fuchsia-600 hover:bg-fuchsia-700", nk: `gev|${e.id}` });
         });
       }
       myPointEvents(stInfo).forEach(e => {
-        const reason = `[이벤트] ${String(e.제목 || "").trim()}`;
         const pv = toNum(e.포인트);
-        const got = (pts || []).some(p => String(p.내역 || "").trim() === reason);
+        const got = pointEventGot(e, pts);
         const until = String(e.종료일).slice(5).replace("-", "/");
         if (got) {
-          todo.push({ cls: "bg-emerald-50 border-emerald-300", html: `🎉 <b>이벤트 포인트 받았어요!</b> ${escapeHtml(e.제목)} <b class="text-emerald-700">+${pv}P</b>` });
+          todo.push({ cls: "bg-emerald-50 border-emerald-300", html: `🎉 <b>이벤트 포인트 받았어요!</b> ${escapeHtml(e.제목)} <b class="text-emerald-700">+${pv}P</b>`, nk: `pevgot|${String(e.제목 || "").trim()}` });
           return;
         }
         const link = safeEventLink(e.링크);
         todo.push({ cls: "bg-yellow-50 border-yellow-300", html: `🎉 <b>이벤트</b>: ${escapeHtml(e.제목)} <b class="text-emerald-700">+${pv}P</b><br><span class="text-xs text-slate-600">${e.설명 ? escapeHtml(e.설명) + " · " : ""}${escapeHtml(until)}까지</span>`,
-          act: link ? () => window.open(link, "_blank", "noopener") : null, label: "바로 가기", color: "bg-yellow-500 hover:bg-yellow-600" });
+          act: link ? () => window.open(link, "_blank", "noopener") : null, label: "바로 가기", color: "bg-yellow-500 hover:bg-yellow-600", nk: `pev|${e.id}` });
       });
       const coreRows = (hw || []).filter(h => String(h.과제명 || "").startsWith("[CORE]")).map(h => ({ h, ph: corePhase(h) }));
       coreRows.filter(x => x.ph.phase === "open").sort((a, b) => String(a.h.날짜).localeCompare(String(b.h.날짜))).forEach(x => {
         todo.push({ cls: "bg-indigo-50 border-indigo-300", html: `📝 <b>CORE</b>: ${escapeHtml(coreTitleOf(x.h))}<br><span class="text-xs text-slate-600">${!Number.isFinite(x.ph.dday) ? "마감일 미정" : x.ph.dday <= 0 ? "<b class='text-rose-600'>오늘 밤 10시 마감!</b>" : `마감 ${escapeHtml(String(x.h.날짜).slice(5))} 밤 10시 (D-${x.ph.dday})`} · 도전 ${parseCoreAttempt(x.h.선생님메모)}/3</span>`,
-          act: () => switchTab("core"), label: "풀러 가기", color: "bg-indigo-700 hover:bg-indigo-800" });
+          act: () => switchTab("core"), label: "풀러 가기", color: "bg-indigo-700 hover:bg-indigo-800", nk: hwNoticeKey(x.h) });
       });
       const normalRows = (hw || []).filter(h => !String(h.과제명 || "").startsWith("[CORE]"));
       normalRows.filter(h => hwState(h) === "open").sort((a, b) => String(a.날짜).localeCompare(String(b.날짜))).forEach(h => {
         const dd = getDaysDiff(String(h.날짜).slice(0, 10), today);
-        todo.push({ cls: "bg-sky-50 border-sky-300", html: `📚 <b>과제</b>: ${escapeHtml(h.과제명)}<br><span class="text-xs text-slate-600">${!Number.isFinite(dd) ? "마감일 미정" : dd <= 0 ? "<b class='text-rose-600'>오늘 밤 10시 마감!</b>" : `마감 ${escapeHtml(String(h.날짜).slice(5))} 밤 10시 (D-${dd})`} · 선생님께 제출하면 +1P</span>` });
+        todo.push({ cls: "bg-sky-50 border-sky-300", html: `📚 <b>과제</b>: ${escapeHtml(h.과제명)}<br><span class="text-xs text-slate-600">${!Number.isFinite(dd) ? "마감일 미정" : dd <= 0 ? "<b class='text-rose-600'>오늘 밤 10시 마감!</b>" : `마감 ${escapeHtml(String(h.날짜).slice(5))} 밤 10시 (D-${dd})`} · 선생님께 제출하면 +1P</span>`, nk: hwNoticeKey(h) });
       });
       coreRows.filter(x => x.ph.phase === "late").forEach(x => {
         todo.push({ cls: "bg-amber-50 border-amber-300", html: `⏰ <b>CORE 늦게 내기</b>: ${escapeHtml(coreTitleOf(x.h))}<br><span class="text-xs text-slate-600">마감 지남 · 포인트 절반 · ${x.ph.daysLeft <= 0 ? "오늘 밤 10시까지" : x.ph.daysLeft + "일 남음"}</span>`,
-          act: () => switchTab("core"), label: "늦게 도전", color: "bg-amber-600 hover:bg-amber-700" });
+          act: () => switchTab("core"), label: "늦게 도전", color: "bg-amber-600 hover:bg-amber-700", nk: hwNoticeKey(x.h) });
       });
       normalRows.filter(h => hwState(h) === "miss" && getDaysDiff(today, String(h.날짜).slice(0, 10)) <= 14).forEach(h => {
         todo.push({ cls: "bg-slate-50 border-slate-300", html: `⌛ <b>마감 지난 과제</b>: ${escapeHtml(h.과제명)} <span class="text-xs text-slate-500">(${escapeHtml(String(h.날짜).slice(5))})</span><br><span class="text-[11px] text-slate-600">늦게라도 선생님께 내면 포인트 절반(+0.5P)</span>` });
       });
       myTodoActions = [];
-      document.getElementById("myTodo").innerHTML = todo.length
+      const nFresh = todo.filter(t => isFresh(t.nk)).length;
+      todo.forEach(t => { if (isFresh(t.nk)) t.html = NEW_BADGE + t.html; });
+      document.getElementById("myTodo").innerHTML = (nFresh ? `<p class="text-xs font-bold text-rose-600">🔔 새로 생긴 것이 ${nFresh}개 있어요 (NEW 표시)</p>` : "") + (todo.length
         ? todo.map(t => {
             let btn = "";
             if (t.act) {
@@ -3522,7 +3526,7 @@
             }
             return `<div class="flex items-center justify-between gap-2 border rounded-lg px-3 py-2.5 text-sm ${t.cls}"><div class="min-w-0 break-keep">${t.html}</div>${btn}</div>`;
           }).join("")
-        : `<p class="text-sm text-emerald-700 font-bold">🎉 지금 챙길 것이 없어요! 단어 공부로 공부시간을 늘려 볼까요?</p>`;
+        : `<p class="text-sm text-emerald-700 font-bold">🎉 지금 챙길 것이 없어요! 단어 공부로 공부시간을 늘려 볼까요?</p>`);
 
       // ---------- 💎 내 포인트 ----------
       const total = (pts || []).reduce((a, r) => a + (parseFloat(r.포인트증감) || 0), 0);
@@ -3684,6 +3688,96 @@
     function safeEventLink(u) {
       const s = String(u || "").trim();
       return /^https:\/\/[^\s"'<>]+$/i.test(s) ? s : "";
+    }
+    function pointEventGot(e, pts) {
+      const reason = `[이벤트] ${String(e.제목 || "").trim()}`;
+      return (pts || []).some(p => String(p.내역 || "").trim() === reason);
+    }
+    function gameEventJoined(e) {
+      return (gameData.eventBest || []).some(x => String(x.event_id) === String(e.id) && x.이름 === currentStudent);
+    }
+
+    // ---------- 🔔 새 소식: 새 과제·CORE·재시·이벤트·이번 주 계획이 생기면 탭에 빨간 숫자 + 'NEW' 표시 ----------
+    // 이미 본 것은 이 기기(브라우저)에만 기억합니다 (서버 통신 없음). 다른 기기에서 처음 열면 한 번 더 NEW로 보일 수 있어요.
+    const NOTI = { who: "", seen: new Set(), fresh: new Set(), pendMy: new Set(), pendCore: new Set() };
+    const NEW_BADGE = `<span class="inline-block align-middle bg-rose-500 text-white text-[10px] font-black leading-none px-1.5 py-1 rounded mr-1">NEW</span>`;
+    function notiLoad(name) {
+      if (NOTI.who === name) return;
+      let arr = null;
+      try { arr = JSON.parse(LS.get(`pqrs_seen_${name}`) || "null"); } catch (e) { arr = null; }
+      Object.assign(NOTI, { who: name, seen: new Set(Array.isArray(arr) ? arr : []), fresh: new Set(), pendMy: new Set(), pendCore: new Set() });
+    }
+    function notiSave() {
+      if (!NOTI.who || isTeacherView()) return;   // 선생님 보기에서는 학생의 '본 것' 기록을 바꾸지 않음
+      LS.set(`pqrs_seen_${NOTI.who}`, JSON.stringify([...NOTI.seen].slice(-300)));
+    }
+    function hwNoticeKey(h) {
+      return `${String(h.과제명 || "").startsWith("[CORE]") ? "core" : "hw"}|${h.과제명}|${String(h.날짜 || "").slice(0, 10)}`;
+    }
+    function weekPlanKey(stInfo, plans) {
+      const p = findPlanFor(plans || [], getKSTDateString(), (stInfo || {}).학교, (stInfo || {}).학년);
+      return p && String(p.주시작 || "").trim() ? `wk|${p.주시작}|${p.업데이트일자 || ""}` : "";
+    }
+    function isFresh(k) { return !!k && NOTI.who === currentStudent && NOTI.fresh.has(k); }
+    // 지금 '할 일'에 보이는 것들의 이름표 (renderMyOverview의 할 일 목록과 같은 기준)
+    function noticeKeys() {
+      if (!currentStudent || !myData || myData.name !== currentStudent) return [];
+      const { stInfo, pts, hw, plans } = myData;
+      const keys = [];
+      (hw || []).forEach(h => {
+        if (String(h.과제명 || "").startsWith("[CORE]")) {
+          const ph = corePhase(h).phase;
+          if (ph === "open" || ph === "late") keys.push(hwNoticeKey(h));
+        } else if (hwState(h) === "open") keys.push(hwNoticeKey(h));
+      });
+      (myRetakes || []).forEach(r => keys.push(`re|${r.range}|${r.date}`));
+      if (gameData.at) myActiveEvents().forEach(e => { if (!gameEventJoined(e)) keys.push(`gev|${e.id}`); });
+      myPointEvents(stInfo).forEach(e => keys.push(pointEventGot(e, pts) ? `pevgot|${String(e.제목 || "").trim()}` : `pev|${e.id}`));
+      const wk = weekPlanKey(stInfo, plans);
+      if (wk) keys.push(wk);
+      return keys;
+    }
+    // viewingMy: 지금 '내 현황'을 보고 있음 → 다 본 것으로 기억 (이번 접속 동안은 NEW 표시 유지)
+    function updateNotices(viewingMy) {
+      if (!currentStudent || !myData || myData.name !== currentStudent) { paintTabBadges(); return; }
+      notiLoad(currentStudent);
+      const keys = noticeKeys();
+      const cur = new Set(keys);
+      keys.forEach(k => {
+        if (NOTI.seen.has(k) || NOTI.fresh.has(k)) return;
+        NOTI.fresh.add(k);
+        NOTI.pendMy.add(k);
+        if (k.startsWith("core|")) NOTI.pendCore.add(k);
+      });
+      [NOTI.pendMy, NOTI.pendCore].forEach(set => [...set].forEach(k => { if (!cur.has(k)) set.delete(k); }));
+      if (currentTab === "core") NOTI.pendCore.clear();
+      if (viewingMy) {
+        keys.forEach(k => NOTI.seen.add(k));
+        NOTI.pendMy.clear();
+        notiSave();
+      } else if (currentTab === "core") {
+        keys.filter(k => k.startsWith("core|")).forEach(k => NOTI.seen.add(k));
+        notiSave();
+      }
+      paintTabBadges();
+    }
+    function paintTabBadges() {
+      const on = !!currentStudent && NOTI.who === currentStudent;
+      [["my", on ? NOTI.pendMy.size : 0], ["core", on ? NOTI.pendCore.size : 0]].forEach(([t, n]) => {
+        const b = document.getElementById(`tabBtn_${t}`);
+        if (!b) return;
+        let d = b.querySelector(".noti-dot");
+        if (n > 0) {
+          if (!d) {
+            d = document.createElement("span");
+            d.className = "noti-dot absolute top-0.5 right-0.5 flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-black leading-none shadow";
+            b.style.position = "relative";   // 탭 오른쪽 위 모서리에 빨간 숫자 (탭 모양 바꾸는 className과 따로)
+            b.appendChild(d);
+          }
+          d.textContent = n > 9 ? "9+" : String(n);
+          d.title = `새로 생긴 것 ${n}개`;
+        } else if (d) d.remove();
+      });
     }
 
     function myActiveEvents() {
