@@ -1400,7 +1400,8 @@
       myRetakes = [];
       Object.keys(grouped).forEach(pr => {
         const list = grouped[pr];
-        const fails = list.filter(v => String(v.결과 || "").includes("미통과") || String(v.결과 || "").includes("미응시"));
+        // 선생님이 '재시 면제'한 기록(결과 끝에 '· 재시 면제')은 밀린 재시에서 뺌 (기록·통과율은 그대로)
+        const fails = list.filter(v => (String(v.결과 || "").includes("미통과") || String(v.결과 || "").includes("미응시")) && !String(v.결과 || "").includes("재시 면제"));
         if (!fails.length) return;
         const lastFail = fails.map(v => String(v.날짜)).sort().pop();
         if (passes.some(p => p.d >= lastFail && covers(p.pr, pr))) return;
@@ -3475,7 +3476,9 @@
         }
       }
       (myRetakes || []).forEach(r => {
-        todo.push({ cls: "bg-rose-50 border-rose-300", html: `🚨 <b>단어 재시</b>: ${escapeHtml(r.range)} <span class="text-xs text-slate-500">(${escapeHtml(r.date)})</span><br><span class="text-[11px] text-slate-600">24시간 안에 통과하면 +0.5P</span>`,
+        // +0.5P는 미통과 다음 날까지 통과할 때만 (시험 저장할 때와 같은 기준: 날짜 차이 1일 이하)
+        const bonusOk = getDaysDiff(today, String(r.date).slice(0, 10)) <= 1;
+        todo.push({ cls: "bg-rose-50 border-rose-300", html: `🚨 <b>단어 재시</b>: ${escapeHtml(r.range)} <span class="text-xs text-slate-500">(${escapeHtml(r.date)})</span><br><span class="text-[11px] text-slate-600">${bonusOk ? "24시간 안에 통과하면 +0.5P" : "통과하면 할 일에서 빠져요 (24시간이 지나 포인트는 없어요)"}</span>`,
           act: () => goRetake(r.range), label: "재시 보기", color: "bg-rose-600 hover:bg-rose-700", nk: `re|${r.range}|${r.date}` });
       });
       if (gameData.at) {
