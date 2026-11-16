@@ -468,6 +468,7 @@
 
     let allStudents = [];
     let allWordbook = [];
+    let wordbookOrder = {};   // 선생님이 정한 단어장 순서 {분류: 순서} (wordbook_order 표, 없으면 올린 순서)
     // [속도 개선] 전체 포인트 기록 대신 '학생별 합계'만 받아옵니다.
     let pointsSummary = {};   // { 이름: { total: 숫자, mins: 숫자, days: 숫자 } }
     let giftRows = [];        // 시크릿선물 기록
@@ -932,7 +933,8 @@
             .catch(e => { if (!isMissingColumnError(e)) throw e; return fetchAllRows("students", '이름, 학교, 학년, 상태, 오답허용률, 등원일정, "사전등원(분)", 보충일정'); }),
           loadRankingData(),
           loadWordbookSmart(false),
-          getLoggedInUser()
+          getLoggedInUser(),
+          loadWordbookOrder()
         ]);
 
         allStudents = stData || [];
@@ -981,8 +983,21 @@
       }
     }
 
+    // 선생님이 정한 단어장 순서 (작은 표 하나, 실패하면 올린 순서 그대로)
+    async function loadWordbookOrder() {
+      try {
+        const { data, error } = await db.from("wordbook_order").select("분류, 순서");
+        if (!error && Array.isArray(data)) wordbookOrder = Object.fromEntries(data.map(r => [r.분류, Number(r.순서)]));
+      } catch (e) {}
+    }
+
+    function orderedWordbookCats(cats) {
+      const big = 1e9;
+      return cats.map((c, i) => [c, i]).sort((a, b) => ((wordbookOrder[a[0]] ?? big) - (wordbookOrder[b[0]] ?? big)) || (a[1] - b[1])).map(x => x[0]);
+    }
+
     function initWordbookCategories() {
-      const cats = [...new Set(allWordbook.map(w => w.분류).filter(Boolean))];
+      const cats = orderedWordbookCats([...new Set(allWordbook.map(w => w.분류).filter(Boolean))]);
       const flashCatEl = document.getElementById("flashCat");
       const examCatEl = document.getElementById("examCat");
       flashCatEl.innerHTML = "";
