@@ -809,7 +809,13 @@
           }
         } catch (e) {}
       }
-      const wbData = await fetchAllRows("wordbook", WORDBOOK_COLS, q => q.not("분류", "like", "[CORE%"));
+      // '지문' 칸(하나로 합쳐 올린 단어장의 원래 지문 이름)이 있으면 같이 받고, 아직 없으면 예전처럼
+      let wbData;
+      try {
+        wbData = await fetchAllRows("wordbook", WORDBOOK_COLS + ", 지문", q => q.not("분류", "like", "[CORE%"));
+      } catch (e) {
+        wbData = await fetchAllRows("wordbook", WORDBOOK_COLS, q => q.not("분류", "like", "[CORE%"));
+      }
       const formatted = (wbData || []).filter(w => !String(w.분류 || "").startsWith("[CORE")).map(w => ({
         ...w,
         단어번호: parseInt(w.단어번호, 10) || 0,
@@ -1678,6 +1684,7 @@
               <button type="button" data-voca-key="${escapeHtml(vk)}" onclick="event.stopPropagation(); toggleFlashVoca(${wi});" class="${starClass(!!myVoca[vk])}">${myVoca[vk] ? "★ 담음" : "☆ 담기"}</button>
               <button type="button" onclick="event.stopPropagation(); speakFlash(${wi});" class="${speakBtnClass()}" title="발음 듣기">🔊</button>
               <span class="text-[11px] text-blue-200 mb-0.5">#${w.단어번호}</span>
+              ${w.지문 ? `<span class="passage-tag text-[10px] text-slate-400 -mt-0.5 mb-0.5 max-w-[90%] truncate" title="${escapeHtml(w.지문)}">📄 ${escapeHtml(w.지문)}</span>` : ""}
               <h3 class="text-xl font-extrabold tracking-wide">${escapeHtml(w.영어단어)}</h3>
               <p class="text-xs text-slate-300 mt-1">${escapeHtml(w.발음기호)}</p>
               <p class="text-xs text-blue-300 font-bold mt-0.5">${escapeHtml(w.한글발음)}</p>
