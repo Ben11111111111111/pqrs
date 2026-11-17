@@ -351,7 +351,7 @@
         <p class="text-xs text-slate-600 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2 mb-3 leading-relaxed">
           ✅ <b>90점 이상이면 통과!</b> 과제당 최대 <b>3번</b> 도전할 수 있어요. ⏰ 마감은 <b>마감일 밤 10시</b>!<br>
           💎 장학금(지문당): 1번 만에 통과 <b>+0.5P</b> · 2번째 <b>+0.25P</b> · 3번째 <b>+0.125P</b><br>
-          🐢 마감 후 7일까지(선생님이 시험 끝나는 날을 정하면 그날까지) 늦게 낼 수 있지만 <b>포인트는 절반</b>이에요.
+          🐢 마감 후 7일까지는 늦게 내도 <b>포인트 절반</b>, 그 뒤에는 선생님이 정한 시험 끝나는 날까지 <b>포인트 없이</b> 풀 수 있어요.
         </p>
         <div id="coreListContainer" class="space-y-2"></div>
       </div>
@@ -1165,7 +1165,7 @@
       ["🏠 내 현황", "오늘 할 일(재시험·과제·CORE), 이번 주 수업과 <b>내 단어시험 범위</b>, 다가오는 수업 시간, 내 포인트가 한 화면에 나와요."],
       ["📇 암기장", "<b>카드 암기</b>: 카드를 누르면 뜻이 보여요. 🔊로 발음 듣기, ☆ 담기로 <b>나만의 단어장</b>에 저장.<br><b>단어 게임</b>: 타임어택·서바이벌·짝 맞추기. 성공할 때마다 +0.125P (하루 최대 1P)."],
       ["⏱️ 단어시험", "<b>연습 모드</b>는 기록 없이 연습, <b>실전 모드</b>는 성적이 선생님께 전송돼요. 본시험 통과 +1P.<br>통과 못 한 범위는 <b>재시 버튼</b>이 생겨요. 24시간 안에 재시 통과하면 +0.5P."],
-      ["📝 CORE", "선생님이 낸 기출 문제 과제예요. 마감은 <b>마감일 밤 10시</b>, 최대 3번 도전, 90점 이상이면 통과.<br>1번 만에 +0.5P · 2번째 +0.25P · 3번째 +0.125P. 마감 후 7일까지(시험 끝나는 날이 정해져 있으면 그날까지) 늦게 낼 수 있어요(포인트 절반)."],
+      ["📝 CORE", "선생님이 낸 기출 문제 과제예요. 마감은 <b>마감일 밤 10시</b>, 최대 3번 도전, 90점 이상이면 통과.<br>1번 만에 +0.5P · 2번째 +0.25P · 3번째 +0.125P. 마감 후 7일까지는 늦게 내면 포인트 절반, 그 뒤 시험 끝나는 날까지는 포인트 없이 풀 수 있어요."],
       ["🏆 랭킹", "<b>나의 순위</b>(같은 학교·학년과 비교, 친구 이름은 가려져요), 공부시간왕, 장학금 명예의 전당."],
       ["⏱️ 공부시간", "암기장·단어시험·CORE 탭에서 화면을 쓰는 동안 1분 단위로 자동 기록돼요. 1분 동안 터치가 없으면 멈추고, 하루 최대 3시간까지 인정돼요."],
       ["💎 장학금", "포인트 <b>50P</b>를 모으면 장학금 <b>25,000원</b>! 꾸준히 공부하면 시크릿 선물도 있어요."]
@@ -2395,6 +2395,14 @@
       return cands.length && cands[0] > base ? { end: cands[0], byExam: true } : { end: base, byExam: false };
     }
 
+    // 늦게 내기 안내 문구 (CORE 목록·할 일 같이 씀)
+    function coreLateBadgeText(ph) {
+      const left = n => (n <= 0 ? "오늘 밤 10시까지" : n + "일 남음");
+      const examTxt = ph.byExam ? `시험 끝나는 날 ${ph.lateEnd.slice(5).replace("-", "/")}까지` : "";
+      if (ph.half) return `⏰ 마감 지남 · 늦게 내기 가능 (포인트 절반 ${left(ph.halfDaysLeft)}${examTxt ? " · " + examTxt + " 풀 수 있음" : ""})`;
+      return `⏰ 마감 7일 지남 · 포인트 없이 풀기 가능 (${examTxt || left(ph.daysLeft)})`;
+    }
+
     // 과제 상태: open(마감 전) / late(마감 후 늦게 내기 가능) / closed(기간 끝) / done(통과) / lateDone(지각 통과) / failed(3번 실패)
     function corePhase(row) {
       const res = String(row.결과 || "").trim();
@@ -2409,7 +2417,9 @@
       const today = getKSTDateString();
       if (nowS < `${d} ${CORE_DEADLINE_HOUR}:00`) return { phase: "open", dday: getDaysDiff(d, today) };
       const le = coreLateEnd(d, row.이름), lateEnd = le.end;
-      if (nowS < `${lateEnd} ${CORE_DEADLINE_HOUR}:00`) return { phase: "late", daysLeft: getDaysDiff(lateEnd, today), lateEnd, byExam: le.byExam };
+      const halfEnd = addDaysStr(d, CORE_LATE_DAYS);   // 마감 후 7일까지는 포인트 절반, 그 뒤는 포인트 없음
+      if (nowS < `${lateEnd} ${CORE_DEADLINE_HOUR}:00`) return { phase: "late", daysLeft: getDaysDiff(lateEnd, today), lateEnd, byExam: le.byExam,
+        half: nowS < `${halfEnd} ${CORE_DEADLINE_HOUR}:00`, halfDaysLeft: getDaysDiff(halfEnd, today) };
       return { phase: "closed" };
     }
 
@@ -2479,7 +2489,7 @@
         } else if (ph.phase === "closed") {
           badge = `<span class="text-[11px] font-extrabold px-2 py-0.5 rounded bg-slate-200 text-slate-700">⌛ 제출 기간 끝</span>`;
         } else if (ph.phase === "late") {
-          badge = `<span class="text-[11px] font-extrabold px-2 py-0.5 rounded bg-amber-100 text-amber-800">⏰ 마감 지남 · 늦게 내기 가능 (포인트 절반, ${ph.daysLeft <= 0 ? "오늘 밤 10시까지" : ph.daysLeft + "일 남음"}${ph.byExam ? ` · 시험 끝나는 날 ${ph.lateEnd.slice(5).replace("-", "/")}까지` : ""})</span>`;
+          badge = `<span class="text-[11px] font-extrabold px-2 py-0.5 rounded bg-amber-100 text-amber-800">${coreLateBadgeText(ph)}</span>`;
           action = `<button onclick="startCoreQuiz(${i})" class="shrink-0 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-sm">▶ 늦게 도전 (${tries + 1}번째)</button>`;
         } else {
           badge = `<span class="text-[11px] font-extrabold px-2 py-0.5 rounded bg-rose-100 text-rose-700">진행중 · ${ph.dday <= 0 ? "오늘 밤 10시 마감" : "D-" + ph.dday}</span>`;
@@ -2665,7 +2675,8 @@
           cancelCoreQuiz();
           return;
         }
-        const isLateNow = corePhase(liveRow).phase === "late";
+        const livePh = corePhase(liveRow);
+        const isLateNow = livePh.phase === "late";
         const tryNo = parseCoreAttempt(liveRow.선생님메모) + 1;
         if (tryNo > CORE_MAX_TRIES) {
           alert("도전 횟수(3번)를 모두 사용했어요.");
@@ -2702,7 +2713,7 @@
         let pointMsg = "";
         if (passed) {
           const basePts = CORE_POINTS_BY_TRY[tryNo - 1] || 0;
-          const pts = isLateNow ? basePts / 2 : basePts;
+          const pts = isLateNow ? (livePh.half ? basePts / 2 : 0) : basePts;   // 마감 후 7일까지 절반, 그 뒤 0
           const reasonOn = `CORE 과제 통과 (${qa.title})`;
           const reasonLate = `CORE 과제 지각통과 (${qa.title})`;
           const reason = isLateNow ? reasonLate : reasonOn;
@@ -2715,6 +2726,7 @@
               ? `🐢 ${tryNo}번째 도전 통과! 마감 후 제출이라 장학금은 절반인 +${pts}P예요. 다음엔 마감 전에!`
               : `✨ ${tryNo}번째 도전 통과! 장학금 +${pts}P를 받았어요!`;
           }
+          if (isLateNow && !livePh.half) pointMsg = `🐢 ${tryNo}번째 도전 통과! 마감 후 7일이 지나서 장학금은 없지만, 시험 준비 잘했어요!`;
           confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
         } else if (tryNo >= CORE_MAX_TRIES) {
           pointMsg = "3번의 도전이 모두 끝났어요. 아래 해설로 꼭 복습하세요!";
@@ -3569,7 +3581,7 @@
         todo.push({ cls: "bg-sky-50 border-sky-300", html: `📚 <b>과제</b>: ${escapeHtml(h.과제명)}<br><span class="text-xs text-slate-600">${!Number.isFinite(dd) ? "마감일 미정" : dd <= 0 ? "<b class='text-rose-600'>오늘 밤 10시 마감!</b>" : `마감 ${escapeHtml(String(h.날짜).slice(5))} 밤 10시 (D-${dd})`} · 선생님께 제출하면 +1P</span>`, nk: hwNoticeKey(h) });
       });
       coreRows.filter(x => x.ph.phase === "late").forEach(x => {
-        todo.push({ cls: "bg-amber-50 border-amber-300", html: `⏰ <b>CORE 늦게 내기</b>: ${escapeHtml(coreTitleOf(x.h))}<br><span class="text-xs text-slate-600">마감 지남 · 포인트 절반 · ${x.ph.daysLeft <= 0 ? "오늘 밤 10시까지" : x.ph.daysLeft + "일 남음"}</span>`,
+        todo.push({ cls: "bg-amber-50 border-amber-300", html: `⏰ <b>CORE 늦게 내기</b>: ${escapeHtml(coreTitleOf(x.h))}<br><span class="text-xs text-slate-600">${escapeHtml(coreLateBadgeText(x.ph).replace(/^⏰ /, ""))}</span>`,
           act: () => switchTab("core"), label: "늦게 도전", color: "bg-amber-600 hover:bg-amber-700", nk: hwNoticeKey(x.h) });
       });
       normalRows.filter(h => hwState(h) === "miss" && getDaysDiff(today, String(h.날짜).slice(0, 10)) <= 14).forEach(h => {
