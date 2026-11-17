@@ -351,7 +351,7 @@
         <p class="text-xs text-slate-600 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2 mb-3 leading-relaxed">
           ✅ <b>90점 이상이면 통과!</b> 과제당 최대 <b>3번</b> 도전할 수 있어요. ⏰ 마감은 <b>마감일 밤 10시</b>!<br>
           💎 장학금(지문당): 1번 만에 통과 <b>+0.5P</b> · 2번째 <b>+0.25P</b> · 3번째 <b>+0.125P</b><br>
-          🐢 마감 후 7일까지는 늦게 낼 수 있지만 <b>포인트는 절반</b>이에요.
+          🐢 마감 후 7일까지(선생님이 시험 끝나는 날을 정하면 그날까지) 늦게 낼 수 있지만 <b>포인트는 절반</b>이에요.
         </p>
         <div id="coreListContainer" class="space-y-2"></div>
       </div>
@@ -468,6 +468,7 @@
 
     let allStudents = [];
     let allWordbook = [];
+    let coreExamEnds = [];   // 학교·학년별 시험 끝나는 날 (core_exam_end 표). 그날 밤 10시까지 CORE 늦게 풀기
     let wordbookOrder = {};   // 선생님이 정한 단어장 순서 {분류: 순서} (wordbook_order 표, 없으면 올린 순서)
     // [속도 개선] 전체 포인트 기록 대신 '학생별 합계'만 받아옵니다.
     let pointsSummary = {};   // { 이름: { total: 숫자, mins: 숫자, days: 숫자 } }
@@ -934,7 +935,8 @@
           loadRankingData(),
           loadWordbookSmart(false),
           getLoggedInUser(),
-          loadWordbookOrder()
+          loadWordbookOrder(),
+          loadCoreExamEnds()
         ]);
 
         allStudents = stData || [];
@@ -1163,7 +1165,7 @@
       ["🏠 내 현황", "오늘 할 일(재시험·과제·CORE), 이번 주 수업과 <b>내 단어시험 범위</b>, 다가오는 수업 시간, 내 포인트가 한 화면에 나와요."],
       ["📇 암기장", "<b>카드 암기</b>: 카드를 누르면 뜻이 보여요. 🔊로 발음 듣기, ☆ 담기로 <b>나만의 단어장</b>에 저장.<br><b>단어 게임</b>: 타임어택·서바이벌·짝 맞추기. 성공할 때마다 +0.125P (하루 최대 1P)."],
       ["⏱️ 단어시험", "<b>연습 모드</b>는 기록 없이 연습, <b>실전 모드</b>는 성적이 선생님께 전송돼요. 본시험 통과 +1P.<br>통과 못 한 범위는 <b>재시 버튼</b>이 생겨요. 24시간 안에 재시 통과하면 +0.5P."],
-      ["📝 CORE", "선생님이 낸 기출 문제 과제예요. 마감은 <b>마감일 밤 10시</b>, 최대 3번 도전, 90점 이상이면 통과.<br>1번 만에 +0.5P · 2번째 +0.25P · 3번째 +0.125P. 마감 후 7일까지는 늦게 낼 수 있어요(포인트 절반)."],
+      ["📝 CORE", "선생님이 낸 기출 문제 과제예요. 마감은 <b>마감일 밤 10시</b>, 최대 3번 도전, 90점 이상이면 통과.<br>1번 만에 +0.5P · 2번째 +0.25P · 3번째 +0.125P. 마감 후 7일까지(시험 끝나는 날이 정해져 있으면 그날까지) 늦게 낼 수 있어요(포인트 절반)."],
       ["🏆 랭킹", "<b>나의 순위</b>(같은 학교·학년과 비교, 친구 이름은 가려져요), 공부시간왕, 장학금 명예의 전당."],
       ["⏱️ 공부시간", "암기장·단어시험·CORE 탭에서 화면을 쓰는 동안 1분 단위로 자동 기록돼요. 1분 동안 터치가 없으면 멈추고, 하루 최대 3시간까지 인정돼요."],
       ["💎 장학금", "포인트 <b>50P</b>를 모으면 장학금 <b>25,000원</b>! 꾸준히 공부하면 시크릿 선물도 있어요."]
@@ -2371,6 +2373,28 @@
     const CORE_DEADLINE_HOUR = 22;   // 마감일 밤 10시 마감
     const CORE_LATE_DAYS = 7;        // 마감 후 7일까지 늦게 제출 가능 (포인트 절반)
 
+    // 선생님이 정한 학교·학년별 시험 끝나는 날 (표가 없으면 빈 목록 → 마감 후 7일 규칙)
+    async function loadCoreExamEnds() {
+      try {
+        const { data, error } = await db.from("core_exam_end").select("학교, 학년, 종료일");
+        if (!error && Array.isArray(data)) coreExamEnds = data;
+      } catch (e) {}
+    }
+
+    function gradeNum(g) { return String(g || "").replace(/고|학년/g, "").trim(); }
+
+    // CORE를 늦게 풀 수 있는 마지막 날 (그날 밤 10시까지): 마감 + 7일, 그 학생 학교·학년의 '이 과제 다음 시험 끝나는 날'이 더 늦으면 그날
+    function coreLateEnd(d, name) {
+      const base = addDaysStr(d, CORE_LATE_DAYS);
+      const s = (allStudents || []).find(x => x.이름 === name) || (myData && myData.stInfo) || {};
+      const sch = String(s.학교 || "").trim(), gr = gradeNum(s.학년);
+      const cands = (coreExamEnds || [])
+        .filter(e => String(e.학교 || "").trim() === sch && gradeNum(e.학년) === gr)
+        .map(e => String(e.종료일 || "").slice(0, 10))
+        .filter(x => /^\d{4}-\d{2}-\d{2}$/.test(x) && x >= d).sort();
+      return cands.length && cands[0] > base ? { end: cands[0], byExam: true } : { end: base, byExam: false };
+    }
+
     // 과제 상태: open(마감 전) / late(마감 후 늦게 내기 가능) / closed(기간 끝) / done(통과) / lateDone(지각 통과) / failed(3번 실패)
     function corePhase(row) {
       const res = String(row.결과 || "").trim();
@@ -2384,8 +2408,8 @@
       const nowS = kstNowStamp();
       const today = getKSTDateString();
       if (nowS < `${d} ${CORE_DEADLINE_HOUR}:00`) return { phase: "open", dday: getDaysDiff(d, today) };
-      const lateEnd = addDaysStr(d, CORE_LATE_DAYS);
-      if (nowS < `${lateEnd} ${CORE_DEADLINE_HOUR}:00`) return { phase: "late", daysLeft: getDaysDiff(lateEnd, today) };
+      const le = coreLateEnd(d, row.이름), lateEnd = le.end;
+      if (nowS < `${lateEnd} ${CORE_DEADLINE_HOUR}:00`) return { phase: "late", daysLeft: getDaysDiff(lateEnd, today), lateEnd, byExam: le.byExam };
       return { phase: "closed" };
     }
 
@@ -2455,7 +2479,7 @@
         } else if (ph.phase === "closed") {
           badge = `<span class="text-[11px] font-extrabold px-2 py-0.5 rounded bg-slate-200 text-slate-700">⌛ 제출 기간 끝</span>`;
         } else if (ph.phase === "late") {
-          badge = `<span class="text-[11px] font-extrabold px-2 py-0.5 rounded bg-amber-100 text-amber-800">⏰ 마감 지남 · 늦게 내기 가능 (포인트 절반, ${ph.daysLeft <= 0 ? "오늘 밤 10시까지" : ph.daysLeft + "일 남음"})</span>`;
+          badge = `<span class="text-[11px] font-extrabold px-2 py-0.5 rounded bg-amber-100 text-amber-800">⏰ 마감 지남 · 늦게 내기 가능 (포인트 절반, ${ph.daysLeft <= 0 ? "오늘 밤 10시까지" : ph.daysLeft + "일 남음"}${ph.byExam ? ` · 시험 끝나는 날 ${ph.lateEnd.slice(5).replace("-", "/")}까지` : ""})</span>`;
           action = `<button onclick="startCoreQuiz(${i})" class="shrink-0 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-sm">▶ 늦게 도전 (${tries + 1}번째)</button>`;
         } else {
           badge = `<span class="text-[11px] font-extrabold px-2 py-0.5 rounded bg-rose-100 text-rose-700">진행중 · ${ph.dday <= 0 ? "오늘 밤 10시 마감" : "D-" + ph.dday}</span>`;
@@ -3057,7 +3081,7 @@
       { k: "hw", icon: "📚", label: "일반 과제 제출율", rate: true, get: o => o.h_n ? o.h_d / o.h_n : null, sub: o => `${o.h_n}건 중 ${o.h_d}건 제출`,
         up: "마감(밤 10시) 전에 내요. 늦게라도 내면 절반 포인트!", none: "최근 30일 마감된 과제가 없어요" },
       { k: "core", icon: "📝", label: "CORE 과제 제출율", rate: true, get: o => o.c_n ? o.c_d / o.c_n : null, sub: o => `${o.c_n}건 중 ${o.c_d}건 통과`,
-        up: "마감 후 7일 안에는 늦게라도 풀 수 있어요!", none: "최근 30일 마감된 CORE 과제가 없어요" },
+        up: "마감이 지나도 늦게 풀 수 있는 기간에는 늦게라도 풀어요!", none: "최근 30일 마감된 CORE 과제가 없어요" },
       { k: "clinic", icon: "🏥", label: "클리닉 통과율", rate: true, get: o => o.k_n ? o.k_p / o.k_n : null, sub: o => `클리닉 ${o.k_n}회 중 ${o.k_p}회 통과 (면제 제외)`,
         up: "클리닉에 빠지지 말고, 준비해 와서 한 번에 통과해요!", none: "최근 30일 클리닉 기록이 없어요" },
       { k: "att", icon: "📅", label: "출석률", rate: true, get: o => o.a_n ? o.a_p / o.a_n : null, sub: o => `${o.a_n}번 수업 중 ${o.a_p}번 참석`,
