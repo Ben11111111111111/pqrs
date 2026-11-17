@@ -1940,15 +1940,10 @@
       const todayStr = getKSTDateString();
 
       if (mode === "real") {
-        const recentPassed = myVocabTests.find(v => {
-          if (extractPureRange(v.비고) !== pureRange) return false;
-          if (!String(v.결과 || "").startsWith("통과")) return false;
-          const diff = getDaysDiff(todayStr, v.날짜);
-          return diff >= 0 && diff < SAME_RANGE_COOLDOWN_DAYS;
-        });
+        const recentPassed = recentPassBlocking(myVocabTests, pureRange, todayStr);
 
         if (recentPassed) {
-          alert(`🚨 [${pureRange}] 범위는 최근(${recentPassed.날짜})에 이미 '통과'한 시험입니다!\n\n• 동일한 범위는 통과한 날로부터 ${SAME_RANGE_COOLDOWN_DAYS}일이 지난 뒤(2주 뒤 복습 시험 등) 다시 실전 모드로 응시할 수 있습니다.\n• 지금 바로 자율 복습을 원하시면 '🛠️ 연습 모드'를 선택해 주세요!`);
+          alert(`🚨 [${pureRange}] 범위는 최근(${recentPassed.날짜})에 이미 '통과'한 시험입니다!\n\n• 동일한 범위는 통과한 날로부터 ${SAME_RANGE_COOLDOWN_DAYS}일이 지난 뒤(2주 뒤 복습 시험 등) 다시 실전 모드로 응시할 수 있습니다. (선생님이 오늘 주간 진도로 정해 준 범위는 예외)\n• 지금 바로 자율 복습을 원하시면 '🛠️ 연습 모드'를 선택해 주세요!`);
           return;
         }
       }
@@ -2213,11 +2208,7 @@
             .filter(v => extractPureRange(v.비고) === pureRange)
             .sort((a, b) => String(a.날짜).localeCompare(String(b.날짜)));
 
-          const recentPassedNow = sameRangeHistory.find(v => {
-            if (!String(v.결과 || "").startsWith("통과")) return false;
-            const diff = getDaysDiff(todayStr, v.날짜);
-            return diff >= 0 && diff < SAME_RANGE_COOLDOWN_DAYS;
-          });
+          const recentPassedNow = recentPassBlocking(sameRangeHistory, pureRange, todayStr);
 
           if (recentPassedNow) {
             alert(`🚨 [${pureRange}] 범위는 최근(${recentPassedNow.날짜})에 이미 통과 처리된 시험입니다! 중복 제출이 차단되었습니다.`);
@@ -2918,6 +2909,27 @@
         out.push({ range: SESSIONS_JS.includes(s1) ? planRange(plans, d1, stInfo, s1, tests) : "", why: `미리수강 (${d1.slice(5).replace("-", "/")} ${SESSIONS_JS.includes(s1) ? s1 : ""} 대신)` });
       });
       return out;
+    }
+
+    // 오늘 선생님이 주간 진도로 정해 준 범위 ('점단어 1~100번' 형식). 이 범위는 7일 재응시 제한에서 빠짐 (복습 시험)
+    function plannedRangeKeysToday() {
+      try {
+        if (!myData || !myData.stInfo) return new Set();
+        return new Set(expectedTestsFor(myData.stInfo, getKSTDateString(), myData.plans || [], myData.att || [])
+          .map(x => normRangeText(x.range)).filter(Boolean).map(x => x.key));
+      } catch (e) { return new Set(); }
+    }
+
+    // 같은 범위 7일 재응시 제한: 최근 통과 기록을 찾음. 오늘 주간 진도 범위면 '오늘 통과한 것'만 막음 (하루에 두 번 포인트 방지)
+    function recentPassBlocking(tests, pureRange, todayStr) {
+      const planned = plannedRangeKeysToday().has(pureRange);
+      return (tests || []).find(v => {
+        if (extractPureRange(v.비고) !== pureRange) return false;
+        if (!String(v.결과 || "").startsWith("통과")) return false;
+        const diff = getDaysDiff(todayStr, v.날짜);
+        if (planned && diff > 0) return false;
+        return diff >= 0 && diff < SAME_RANGE_COOLDOWN_DAYS;
+      });
     }
 
     function takenRangesOn(tests, ds) {
