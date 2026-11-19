@@ -2959,6 +2959,14 @@
     // 같은 범위 7일 재응시 제한: 최근 통과 기록을 찾음. 오늘 주간 진도 범위면 '오늘 통과한 것'만 막음 (하루에 두 번 포인트 방지)
     function recentPassBlocking(tests, pureRange, todayStr) {
       const planned = plannedRangeKeysToday().has(pureRange);
+      // 통과한 날보다 뒤에 그 범위 미통과·미응시(결석 재시 등)가 생겼으면 밀린 재시 → 막지 않음 (재시 면제된 것은 제외)
+      const same = (tests || []).filter(v => extractPureRange(v.비고) === pureRange);
+      const lastPass = same.filter(v => String(v.결과 || "").startsWith("통과")).map(v => String(v.날짜 || "").slice(0, 10)).sort().pop() || "";
+      const laterRetake = lastPass && same.some(v => {
+        const r = String(v.결과 || "");
+        return (r.includes("미통과") || r.startsWith("미응시")) && !r.includes("재시 면제") && String(v.날짜 || "").slice(0, 10) > lastPass;
+      });
+      if (laterRetake) return undefined;
       return (tests || []).find(v => {
         if (extractPureRange(v.비고) !== pureRange) return false;
         if (!String(v.결과 || "").startsWith("통과")) return false;
